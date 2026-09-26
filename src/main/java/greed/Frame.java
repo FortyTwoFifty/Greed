@@ -74,15 +74,22 @@ final class Frame {
         int inner = cols - 2;
         List<String> body = new ArrayList<>();
         if (!names) {
-            for (String line : title()) {
-                body.add(line);
+            int text = Math.max(1, inner - 2);
+            char cell = snap.unicode ? '\u2588' : '#';
+            List<String> block = new ArrayList<>();
+            for (int r = 0; r < 5; r++) {
+                block.add(bannerRow("GREED", r, cell));
             }
-            body.add("");
-            body.add("First to " + Scorer.format(snap.winning) + ". Hold 1s, 5s, and three of a kind.");
-            body.add("");
-            body.addAll(cheat(snap, g));
-            body.add("");
-            body.add("How many players?  [1-9,  0 = 10]");
+            block.add("");
+            block.add("First to " + Scorer.format(snap.winning) + ". Hold 1s, 5s, and three of a kind.");
+            block.add("");
+            block.addAll(cheat(snap, g));
+            block.add("");
+            block.add("How many players?");
+            for (String line : block) {
+                body.add(centerIn(line, text));
+            }
+            return present(snap, g, cols, rows, body, inner, null, setupHint(snap, text), true, null);
         } else {
             body.add("Name each seat. Enter moves on. Empty uses Player N.");
             if (snap.solo) {
@@ -106,7 +113,8 @@ final class Frame {
                 body.add(snap.fieldError);
             }
         }
-        return chrome(snap, g, cols, rows, body, inner, names ? "type a name, Enter seats them, q quits" : "1-9 players, 0 = 10, q quits");
+        return present(snap, g, cols, rows, body, inner,
+                "type a name, Enter seats them, q quits", null, false, null);
     }
 
     private static String rookName(Snapshot snap) {
@@ -121,55 +129,162 @@ final class Frame {
     private static List<String> winner(Snapshot snap, int cols, int rows) {
         Glyphs g = Glyphs.of(snap.unicode);
         int inner = cols - 2;
+        int text = Math.max(1, inner - 2);
         List<Player> players = seat(snap);
         Player winner = snap.winner == null ? players.get(0) : snap.winner;
         List<Player> order = new ArrayList<>(players);
         order.sort((left, right) -> Integer.compare(right.score, left.score));
+        char cell = snap.unicode ? '\u2588' : '#';
+        String heading = winner.name.toUpperCase(Locale.ROOT) + " WINS";
         List<String> body = new ArrayList<>();
-        body.add("");
-        body.add(winner.name.toUpperCase(Locale.ROOT) + " WINS");
-        body.add("");
+        for (int r = 0; r < 5; r++) {
+            body.add(centerIn(bannerRow(heading, r, cell), text));
+        }
+        body.add(centerIn("", text));
+        String winnerLine = null;
         for (int i = 0; i < order.size(); i++) {
             Player player = order.get(i);
-            String rank = (i + 1) + "  ";
-            String score = Scorer.format(player.score);
-            String bot = player.computer ? " [bot]" : "";
-            String name = player.name + bot;
-            int text = Math.max(1, inner - 2);
-            int room = text - Paint.width(rank) - 2 - Paint.width(score);
-            if (room >= Paint.width(name)) {
-                int gap = text - Paint.width(rank) - Paint.width(name) - Paint.width(score);
-                body.add(rank + name + Paint.spaces(Math.max(0, gap)) + score);
-            } else {
-                for (String part : wrap(name, Math.max(1, text - Paint.width(rank)))) {
-                    body.add(rank + part);
-                    rank = Paint.spaces(Paint.width(rank));
-                }
-                body.add(Paint.spaces(Math.max(0, text - Paint.width(score))) + score);
+            boolean champion = player == winner;
+            String row = standingRow(g, i + 1, player, champion);
+            String centered = centerIn(row, text);
+            if (champion) {
+                winnerLine = centered;
             }
+            body.add(centered);
         }
-        return chrome(snap, g, cols, rows, body, inner, "n new game   q quit");
+        List<Seg> hint = new ArrayList<>();
+        addPair(hint, "n", "new game", true, true);
+        addPair(hint, "q", "quit", true, false);
+        return present(snap, g, cols, rows, body, inner, null, spread(snap, text, hint, List.of(), text - segWidth(hint)),
+                true, winnerLine);
     }
 
-    /** Header, body, hint, bottom edge. Body is padded or compacted so the frame is exactly {@code rows}. */
-    private static List<String> chrome(Snapshot snap, Glyphs g, int cols, int rows,
-                                        List<String> body, int inner, String hintPlain) {
-        List<String> content = new ArrayList<>(body);
-        int room = rows - 3;
-        content = shrink(content, room);
+    /** About 40 columns: star, rank, full name, score. */
+    private static String standingRow(Glyphs g, int rank, Player player, boolean winner) {
+        String score = Scorer.format(player.score);
+        String bot = player.computer ? " [bot]" : "";
+        String mark = winner ? g.star + " " : "  ";
+        String label = mark + rank + "  " + player.name + bot;
+        int width = 40;
+        int room = width - Paint.width(score) - 1;
+        if (Paint.width(label) > room) {
+            label = ellipsize(label, Math.max(1, room), g.ellipsis);
+        }
+        int gap = width - Paint.width(label) - Paint.width(score);
+        return label + Paint.spaces(Math.max(1, gap)) + score;
+    }
+
+    /**
+     * Header, body, hint, bottom edge.
+     * {@code hintBody} is already {@code inner - 2} wide. When it is null, {@code hintPlain} is used.
+     */
+    private static List<String> present(Snapshot snap, Glyphs g, int cols, int rows, List<String> body, int inner,
+                                         String hintPlain, String hintBody, boolean center, String boldLine) {
         int text = Math.max(1, inner - 2);
+        List<String> content = shrink(new ArrayList<>(body), rows - 3);
+        int spare = rows - 3 - content.size();
+        int before = center ? Math.max(0, spare / 2) : 0;
+        int after = Math.max(0, spare - before);
         List<String> frame = new ArrayList<>();
         frame.add(header(snap, g, cols));
-        for (String line : content) {
-            String style = line.equals(snap.fieldError) ? Paint.RED : "";
-            frame.add(box(inset(plain(line, text, snap, style)), snap, g));
-        }
-        while (frame.size() < rows - 2) {
+        for (int i = 0; i < before; i++) {
             frame.add(box(Paint.spaces(inner), snap, g));
         }
-        frame.add(box(inset(plain(hintPlain, text, snap, Paint.DIM)), snap, g));
+        for (String line : content) {
+            String style = line.equals(snap.fieldError) ? Paint.RED : line.equals(boldLine) ? Paint.BOLD : "";
+            frame.add(box(inset(plain(line, text, snap, style)), snap, g));
+        }
+        for (int i = 0; i < after; i++) {
+            frame.add(box(Paint.spaces(inner), snap, g));
+        }
+        String hint = hintBody == null ? plain(hintPlain == null ? "" : hintPlain, text, snap, Paint.DIM) : hintBody;
+        frame.add(box(inset(hint), snap, g));
         frame.add(bottom(snap, g, cols));
         return frame;
+    }
+
+    private static String setupHint(Snapshot snap, int width) {
+        List<Seg> pairs = new ArrayList<>();
+        addPair(pairs, "1-9", "players", true, true);
+        addPair(pairs, "0", "ten", true, false);
+        addPair(pairs, "q", "quit", true, false);
+        return spread(snap, width, pairs, List.of(), Math.max(0, width - segWidth(pairs)));
+    }
+
+    private static String centerIn(String text, int width) {
+        int size = Paint.width(text);
+        if (size >= width) {
+            return text;
+        }
+        int pad = (width - size) / 2;
+        return Paint.spaces(pad) + text + Paint.spaces(width - pad - size);
+    }
+
+    private static String bannerRow(String word, int row, char cell) {
+        StringBuilder line = new StringBuilder();
+        for (int i = 0; i < word.length(); i++) {
+            if (i > 0) {
+                line.append(' ');
+            }
+            String[] glyph = letter(word.charAt(i));
+            line.append(glyph[row].replace('#', cell));
+        }
+        return line.toString();
+    }
+
+    /** Five rows, four columns, {@code #} marks ink. */
+    private static String[] letter(char c) {
+        return switch (Character.toUpperCase(c)) {
+            case 'A' -> glyph(" ## ", "#  #", "####", "#  #", "#  #");
+            case 'B' -> glyph("### ", "#  #", "### ", "#  #", "### ");
+            case 'C' -> glyph(" ###", "#   ", "#   ", "#   ", " ###");
+            case 'D' -> glyph("### ", "#  #", "#  #", "#  #", "### ");
+            case 'E' -> glyph("####", "#   ", "### ", "#   ", "####");
+            case 'F' -> glyph("####", "#   ", "### ", "#   ", "#   ");
+            case 'G' -> glyph(" ###", "#   ", "# ##", "#  #", " ###");
+            case 'H' -> glyph("#  #", "#  #", "####", "#  #", "#  #");
+            case 'I' -> glyph("### ", " #  ", " #  ", " #  ", "### ");
+            case 'J' -> glyph(" ###", "  # ", "  # ", "# # ", " #  ");
+            case 'K' -> glyph("#  #", "# # ", "##  ", "# # ", "#  #");
+            case 'L' -> glyph("#   ", "#   ", "#   ", "#   ", "####");
+            case 'M' -> glyph("#  #", "## #", "# ##", "#  #", "#  #");
+            case 'N' -> glyph("#  #", "## #", "# ##", "#  #", "#  #");
+            case 'O' -> glyph(" ## ", "#  #", "#  #", "#  #", " ## ");
+            case 'P' -> glyph("### ", "#  #", "### ", "#   ", "#   ");
+            case 'Q' -> glyph(" ## ", "#  #", "#  #", "# # ", " # #");
+            case 'R' -> glyph("### ", "#  #", "### ", "# # ", "#  #");
+            case 'S' -> glyph(" ###", "#   ", " ## ", "   #", "### ");
+            case 'T' -> glyph("####", " #  ", " #  ", " #  ", " #  ");
+            case 'U' -> glyph("#  #", "#  #", "#  #", "#  #", " ## ");
+            case 'V' -> glyph("#  #", "#  #", "#  #", "#  #", " ## ");
+            case 'W' -> glyph("#  #", "#  #", "# ##", "## #", "#  #");
+            case 'X' -> glyph("#  #", "#  #", " ## ", "#  #", "#  #");
+            case 'Y' -> glyph("#  #", "#  #", " ## ", " #  ", " #  ");
+            case 'Z' -> glyph("####", "  # ", " #  ", "#   ", "####");
+            case '0' -> glyph(" ## ", "#  #", "#  #", "#  #", " ## ");
+            case '1' -> glyph(" #  ", "##  ", " #  ", " #  ", "### ");
+            case '2' -> glyph("### ", "   #", " ## ", "#   ", "####");
+            case '3' -> glyph("### ", "   #", " ## ", "   #", "### ");
+            case '4' -> glyph("#  #", "#  #", "####", "   #", "   #");
+            case '5' -> glyph("####", "#   ", "### ", "   #", "### ");
+            case '6' -> glyph(" ###", "#   ", "### ", "#  #", " ## ");
+            case '7' -> glyph("####", "   #", "  # ", " #  ", " #  ");
+            case '8' -> glyph(" ## ", "#  #", " ## ", "#  #", " ## ");
+            case '9' -> glyph(" ## ", "#  #", " ###", "   #", "### ");
+            case ' ' -> glyph("    ", "    ", "    ", "    ", "    ");
+            default -> glyph("####", "#  #", "#  #", "#  #", "####");
+        };
+    }
+
+    private static String[] glyph(String a, String b, String c, String d, String e) {
+        return new String[] {fit4(a), fit4(b), fit4(c), fit4(d), fit4(e)};
+    }
+
+    private static String fit4(String text) {
+        if (text.length() >= 4) {
+            return text.substring(0, 4);
+        }
+        return text + "    ".substring(text.length());
     }
 
     private static List<String> shrink(List<String> content, int room) {
@@ -228,10 +343,6 @@ final class Frame {
             }
             if (logRows > 1) {
                 logRows = 1;
-                continue;
-            }
-            if (showTitle) {
-                showTitle = false;
                 continue;
             }
             if (spare >= 1) {
@@ -401,46 +512,62 @@ final class Frame {
         List<String> lines = new ArrayList<>();
         String name = player.name.toUpperCase(Locale.ROOT);
         if (snap.phase == Snapshot.Phase.CONTINUE) {
-            String one = "CONTINUING " + name + "'S " + snap.diceLeft + " DICE";
-            if (Paint.width(one) <= width) {
-                lines.add(plain(one, width, snap, Paint.YELLOW));
-            } else {
-                lines.add(plain("CONTINUING", width, snap, Paint.YELLOW));
-                for (String part : wrap(name + "'S " + snap.diceLeft + " DICE", width)) {
-                    lines.add(plain(part, width, snap, Paint.YELLOW));
-                }
+            String banker = snap.banker == null ? "" : snap.banker;
+            for (String part : wrap("CONTINUING " + banker.toUpperCase(Locale.ROOT) + "'S "
+                    + snap.diceLeft + " DICE", width)) {
+                lines.add(plain(part, width, snap, Paint.YELLOW));
             }
-        } else {
+            lines.add(plain("Starts at 0 " + g.dot + " " + banker + " keeps " + Scorer.format(snap.banked),
+                    width, snap, ""));
+            return lines;
+        }
+        if (snap.phase == Snapshot.Phase.BUST) {
             for (String part : wrap(name + "'S TURN", width)) {
                 lines.add(plain(part, width, snap, Paint.YELLOW));
             }
+            String lost = Scorer.format(snap.pointsLost);
+            lines.add(valueLine(snap, width, "Hand lost", "", "", lost, Paint.width(lost), Paint.RED));
+            return lines;
         }
-        String risk = snap.phase == Snapshot.Phase.BUST ? "0" : Scorer.format(snap.hand);
+        for (String part : wrap(name + "'S TURN", width)) {
+            lines.add(plain(part, width, snap, Paint.YELLOW));
+        }
+        String risk = Scorer.format(shownRisk(snap));
         String dice = Integer.toString(snap.diceLeft);
         int field = Math.max(Paint.width(risk), Paint.width(dice));
-        String lost = snap.phase == Snapshot.Phase.BUST && snap.pointsLost > 0
-                ? Scorer.format(snap.pointsLost) + " lost" : "";
-        lines.add(valueLine(snap, width, "Hand at risk", lost, Paint.DIM, risk, field, Paint.YELLOW));
+        lines.add(valueLine(snap, width, "Hand at risk", "", "", risk, field, Paint.YELLOW));
         lines.add(valueLine(snap, width, "Dice to roll", "", "", dice, field, Paint.BOLD));
-        if (!lost.isEmpty() && Paint.width("Hand at risk") + 1 + Paint.width(lost) + field >= width) {
-            lines.add(plain(lost, width, snap, Paint.DIM));
-        }
-        if (!player.onBoard && snap.phase != Snapshot.Phase.BUST) {
-            int gap = Math.max(0, snap.opening - snap.hand);
-            String need = "Need " + Scorer.format(snap.opening) + " to get on " + g.dot + " "
-                    + Scorer.format(gap) + " to go";
-            for (String part : wrap(need, width)) {
-                lines.add(plain(part, width, snap, Paint.DIM));
-            }
-        }
-        if (snap.phase == Snapshot.Phase.CONTINUE) {
-            String kept = "Continuing starts at 0. " + snap.banker + " keeps the "
-                    + Scorer.format(snap.banked) + " banked.";
-            for (String part : wrap(kept, width)) {
-                lines.add(plain(part, width, snap, ""));
+        if (!player.onBoard) {
+            if (snap.hand <= 0) {
+                lines.add(plain("Needs " + Scorer.format(snap.opening) + " to get on", width, snap, Paint.DIM));
+            } else if (snap.hand < snap.opening) {
+                int more = snap.opening - snap.hand;
+                lines.add(plain(Scorer.format(more) + " more to get on", width, snap, Paint.DIM));
             }
         }
         return lines;
+    }
+
+    /** Carried total, plus a hold that already scores. An empty or illegal selection adds nothing. */
+    private static int shownRisk(Snapshot snap) {
+        int total = Math.max(0, snap.hand);
+        if (snap.phase != Snapshot.Phase.HOLD || snap.faces == null || snap.selected == null) {
+            return total;
+        }
+        int[] indexes = snap.selectedIndexes();
+        if (indexes.length == 0) {
+            return total;
+        }
+        for (int index : indexes) {
+            if (index < 0 || index >= snap.faces.length) {
+                return total;
+            }
+        }
+        Scorer.Scoring scoring = Scorer.score(LineView.facesAt(snap.faces, indexes));
+        if (!scoring.valid()) {
+            return total;
+        }
+        return total + scoring.points();
     }
 
     /** Label on the left, value in a fixed field on the right. Optional dim note sits between them. */
@@ -508,31 +635,35 @@ final class Frame {
             art[i] = dieArt(snap.faces[i], kinds[i], narrow, g);
             styles[i] = style(kinds[i]);
         }
-        return placeDice(art, styles, inner, dieW, faceRows, snap);
+        return insetEach(placeDice(art, styles, contentWidth(inner), dieW, faceRows, snap));
     }
 
     private static List<String> stripFaces(Snapshot snap, Glyphs g, int inner, int faceRows) {
-        List<Integer> faces = new ArrayList<>();
-        List<Kind> kinds = new ArrayList<>();
+        boolean narrow = faceRows < 5;
         if (snap.phase == Snapshot.Phase.CONTINUE || snap.phase == Snapshot.Phase.HOT) {
             int n = snap.phase == Snapshot.Phase.HOT ? 5 : Math.max(1, snap.diceLeft);
+            String[][] art = new String[n][];
+            String[] styles = new String[n];
             for (int i = 0; i < n; i++) {
-                faces.add(-1);
-                kinds.add(Kind.UNKNOWN);
+                art[i] = dieArt(1, Kind.UNKNOWN, narrow, g);
+                styles[i] = style(Kind.UNKNOWN);
             }
-        } else {
-            for (int face : snap.kept) {
-                faces.add(face);
-                kinds.add(Kind.KEPT);
-            }
-            for (int i = 0; i < snap.diceLeft; i++) {
-                faces.add(-1);
-                kinds.add(Kind.UNKNOWN);
-            }
-            if (faces.isEmpty()) {
-                faces.add(-1);
-                kinds.add(Kind.UNKNOWN);
-            }
+            int dieW = narrow ? 5 : 9;
+            return insetEach(placeDice(art, styles, contentWidth(inner), dieW, faceRows, snap));
+        }
+        List<Integer> faces = new ArrayList<>();
+        List<Kind> kinds = new ArrayList<>();
+        for (int face : snap.kept) {
+            faces.add(face);
+            kinds.add(Kind.KEPT);
+        }
+        for (int i = 0; i < snap.diceLeft; i++) {
+            faces.add(-1);
+            kinds.add(Kind.UNKNOWN);
+        }
+        if (faces.isEmpty()) {
+            faces.add(-1);
+            kinds.add(Kind.UNKNOWN);
         }
         String[][] art = new String[faces.size()][];
         String[] styles = new String[faces.size()];
@@ -543,7 +674,8 @@ final class Frame {
         }
         int dieH = 3;
         int blank = Math.max(0, (faceRows - dieH) / 2);
-        List<String> placed = placeDice(art, styles, inner, 5, dieH, snap);
+        int content = contentWidth(inner);
+        List<String> placed = insetEach(placeDice(art, styles, content, 5, dieH, snap));
         List<String> lines = new ArrayList<>();
         for (int i = 0; i < blank && lines.size() < faceRows; i++) {
             lines.add(Paint.spaces(inner));
@@ -556,6 +688,18 @@ final class Frame {
             return new ArrayList<>(lines.subList(0, faceRows));
         }
         return lines;
+    }
+
+    private static int contentWidth(int inner) {
+        return Math.max(1, inner - 2);
+    }
+
+    private static List<String> insetEach(List<String> lines) {
+        List<String> padded = new ArrayList<>();
+        for (String line : lines) {
+            padded.add(inset(line));
+        }
+        return padded;
     }
 
     private static List<String> placeDice(String[][] art, String[] styles, int inner, int dieW,
@@ -586,9 +730,16 @@ final class Frame {
     private static List<String> tagLines(Snapshot snap, Glyphs g, int inner, boolean narrow,
                                           int tagRows, boolean strip) {
         List<String> lines = new ArrayList<>();
+        if (snap.phase == Snapshot.Phase.BUST) {
+            while (lines.size() < tagRows) {
+                lines.add(Paint.spaces(inner));
+            }
+            return lines;
+        }
         if (strip) {
+            int content = contentWidth(inner);
             String label = stripLabel(snap, g);
-            lines.add(plain(label, inner, snap, Paint.DIM));
+            lines.add(inset(plain(label, content, snap, Paint.DIM)));
             while (lines.size() < tagRows) {
                 lines.add(Paint.spaces(inner));
             }
@@ -608,11 +759,12 @@ final class Frame {
             boolean mark = kinds[i] == Kind.HELD;
             keys[i] = "[" + (i + 1) + "]" + (mark ? " " + g.check : "");
         }
+        int content = contentWidth(inner);
         if (tagRows >= 2) {
-            lines.add(alignUnderDice(keys, snap, g, inner, narrow, ""));
-            lines.add(alignUnderDice(tags, snap, g, inner, narrow, ""));
+            lines.add(inset(alignUnderDice(keys, snap, g, content, narrow, "")));
+            lines.add(inset(alignUnderDice(tags, snap, g, content, narrow, "")));
         } else {
-            lines.add(alignUnderDice(tags, snap, g, inner, narrow, ""));
+            lines.add(inset(alignUnderDice(tags, snap, g, content, narrow, "")));
         }
         while (lines.size() < tagRows) {
             lines.add(Paint.spaces(inner));
@@ -621,11 +773,8 @@ final class Frame {
     }
 
     private static String stripLabel(Snapshot snap, Glyphs g) {
-        if (snap.phase == Snapshot.Phase.CONTINUE) {
-            return snap.banker + " left " + LineView.diceWord(snap.diceLeft);
-        }
-        if (snap.phase == Snapshot.Phase.HOT) {
-            return g.star + " ALL FIVE SCORED " + g.star;
+        if (snap.phase == Snapshot.Phase.CONTINUE || snap.phase == Snapshot.Phase.HOT) {
+            return "";
         }
         if (snap.phase == Snapshot.Phase.BANK) {
             return snap.banner == null ? "" : snap.banner;
@@ -703,13 +852,20 @@ final class Frame {
 
     private static String summary(Snapshot snap, Glyphs g, int inner) {
         int text = Math.max(1, inner - 2);
+        if (snap.phase == Snapshot.Phase.CONTINUE) {
+            String banker = snap.banker == null ? "" : snap.banker;
+            String line = "Continue " + banker + "'s " + snap.diceLeft
+                    + " dice from 0, or start a new hand with 5";
+            return inset(plain(line, text, snap, ""));
+        }
         if (snap.phase == Snapshot.Phase.BUST || snap.phase == Snapshot.Phase.BANK
-                || snap.phase == Snapshot.Phase.HOT) {
+                || snap.phase == Snapshot.Phase.HOT || snap.phase == Snapshot.Phase.DOUBLE_REROLL) {
             String banner = snap.phase == Snapshot.Phase.HOT ? hotBanner(g) : snap.banner;
             if (banner == null) {
                 banner = "";
             }
-            String style = snap.phase == Snapshot.Phase.BUST ? Paint.RED : Paint.GREEN;
+            String style = snap.phase == Snapshot.Phase.BUST ? Paint.RED
+                    : snap.phase == Snapshot.Phase.HOT || snap.phase == Snapshot.Phase.DOUBLE_REROLL ? Paint.YELLOW : Paint.GREEN;
             String shown = Paint.width(banner) <= text ? banner : wrap(banner, text).get(0);
             return inset(plain(shown, text, snap, style));
         }
@@ -734,7 +890,7 @@ final class Frame {
     }
 
     private static String hotBanner(Glyphs g) {
-        return g.star + " ALL FIVE SCORED " + g.dot + " roll all 5 again to keep going " + g.star;
+        return g.star + " ALL FIVE SCORED " + g.dot + " roll all 5 again " + g.star;
     }
 
     private static String selectedText(Snapshot snap) {
@@ -899,13 +1055,9 @@ final class Frame {
         String v = heavy ? g.dv : g.v;
         String top = (heavy ? g.dtl : g.tl) + h.repeat(7) + (heavy ? g.dtr : g.tr);
         String bot = (heavy ? g.dbl : g.bl) + h.repeat(7) + (heavy ? g.dbr : g.br);
-        String[] grid = kind == Kind.BUST
-                ? new String[] {center(g.cross, 7), "       ", "       "}
+        String[] grid = kind == Kind.UNKNOWN
+                ? new String[] {"       ", "       ", "       "}
                 : pips(face, g.pip);
-        // Put the bust mark in the middle row.
-        if (kind == Kind.BUST) {
-            grid = new String[] {"       ", center(g.cross, 7), "       "};
-        }
         return new String[] {
                 top,
                 v + grid[0] + v,
@@ -951,7 +1103,7 @@ final class Frame {
         boolean heavy = kind == Kind.HELD;
         String h = heavy ? g.dh : g.h;
         String v = heavy ? g.dv : g.v;
-        String mark = kind == Kind.BUST ? g.cross : kind == Kind.UNKNOWN ? "?" : Integer.toString(Math.max(1, face));
+        String mark = kind == Kind.UNKNOWN ? " " : Integer.toString(Math.max(1, face));
         if (wide) {
             String top = (heavy ? g.dtl : g.tl) + h.repeat(7) + (heavy ? g.dtr : g.tr);
             String bot = (heavy ? g.dbl : g.bl) + h.repeat(7) + (heavy ? g.dbr : g.br);
@@ -977,14 +1129,6 @@ final class Frame {
         String newer = snap.logNewer == null ? "" : snap.logNewer;
         if (snap.confirmFailed && snap.detail != null && snap.detail.equals(newer)) {
             newer = "";
-        }
-        if (snap.phase == Snapshot.Phase.CONTINUE && snap.banker != null && !snap.banker.isEmpty()) {
-            String kept = "Continuing starts at 0. " + snap.banker + " keeps the "
-                    + Scorer.format(snap.banked) + " banked.";
-            if (!older.contains(kept) && !newer.contains(kept)) {
-                older = newer;
-                newer = kept;
-            }
         }
         List<String> wrapped = new ArrayList<>();
         wrapped.addAll(wrap(older, text));
@@ -1039,7 +1183,7 @@ final class Frame {
     }
 
     private static boolean hasExtra(Snapshot snap) {
-        return snap.phase == Snapshot.Phase.BANK_OR_ROLL || snap.phase == Snapshot.Phase.CONTINUE;
+        return snap.phase == Snapshot.Phase.BANK_OR_ROLL;
     }
 
     private static List<Seg> hintLeft(Snapshot snap, Glyphs g, Player player, boolean labels, boolean extra) {
@@ -1069,13 +1213,11 @@ final class Frame {
             }
             case HOT -> addPair(left, "r/" + g.enter, "roll 5 dice", labels, true);
             case CONTINUE -> {
-                addPair(left, "c", "continue with " + snap.diceLeft + " dice", labels, true);
-                addPair(left, "n", "new hand with 5 dice", labels, false);
-                if (extra) {
-                    left.add(seg("  choose c or n", Paint.DIM, false));
-                }
+                addPair(left, "c", "continue (" + snap.diceLeft + ")", labels, true);
+                addPair(left, "n", "new hand (5)", labels, false);
             }
             case BUST, BANK -> addPair(left, "any key", "continue", labels, true);
+            case DOUBLE_REROLL -> addPair(left, "any key", "roll again", labels, true);
             default -> addPair(left, "q", "quit", labels, true);
         }
         return left;
@@ -1222,18 +1364,9 @@ final class Frame {
         }
         lines.add("three of a kind = face " + times + " 100 (three 1s = 1,000)");
         lines.add("four of a kind " + times + " 2    five of a kind " + times + " 4");
+        lines.add("A set scores only when those dice come from one roll.");
         lines.add("first bank must be " + Scorer.format(snap.opening) + "+");
         return lines;
-    }
-
-    private static String[] title() {
-        return new String[] {
-                "#####  #####  #####  #####  ####",
-                "#      #   #  #      #      #   #",
-                "#  ##  #####  ####   ####   #   #",
-                "#   #  #  #   #      #      #   #",
-                "#####  #   #  #####  #####  ####"
-        };
     }
 
     private static String header(Snapshot snap, Glyphs g, int cols) {

@@ -258,7 +258,6 @@ final class TuiView implements View {
         snap.diceLeft = diceLeft;
         snap.banked = banked;
         snap.faces = new int[0];
-        snap.log(player.name + ", " + banker + " left " + LineView.diceWord(diceLeft) + " unscored.");
         redraw();
         if (player.computer) {
             Bot.Choice choice = Bot.cont(diceLeft);
@@ -299,6 +298,15 @@ final class TuiView implements View {
             }
             redraw();
         }
+    }
+
+    @Override
+    public void doubleReRoll(Player player) {
+        focus(player);
+        snap.phase = Snapshot.Phase.DOUBLE_REROLL;
+        snap.banner = "DOUBLE · rolling again";
+        snap.log("\"" + player.name + "\" got a double.");
+        redraw();
     }
 
     @Override
@@ -406,6 +414,7 @@ final class TuiView implements View {
             case HOT -> pressOnly(snap, key, false);
             case CONTINUE -> pressTwo(snap, key, 'c', "continue", 'n', "new", "choose c or n");
             case BUST, BANK -> "ack";
+            case DOUBLE_REROLL -> "ack";
             case WIN -> pressWin(key);
             case SETUP_COUNT -> pressCount(snap, key);
             case SETUP_NAMES -> pressName(snap, key);
@@ -760,7 +769,7 @@ final class TuiView implements View {
 
     private static boolean tablePhase(Snapshot.Phase phase) {
         return switch (phase) {
-            case HOLD, BANK_OR_ROLL, ROLL_ONLY, HOT, CONTINUE, BUST, BANK -> true;
+            case HOLD, BANK_OR_ROLL, ROLL_ONLY, HOT, CONTINUE, BUST, BANK, DOUBLE_REROLL -> true;
             default -> false;
         };
     }
