@@ -22,6 +22,7 @@ public final class TuiTest {
         resizeMessage();
         namesAndWindow();
         rulesOverlay();
+        layout();
         options();
         imports();
         if (failed > 0) {
@@ -294,6 +295,108 @@ public final class TuiTest {
         check(frame.contains("1 = 100"), "rules include single scoring");
         check(frame.contains("esc"), "rules say how to close");
         assertFrame(Frame.render(snap, 60, 20), 60, 20, "rules narrow");
+    }
+
+    private static void layout() {
+        String wide = Frame.render(hold(), 80, 24);
+        String[] wideLines = wide.split("\n", -1);
+        String header = strip(wideLines[0]);
+        check(header.startsWith("\u256D\u2500 GREED ") && header.endsWith(" to 10,000 \u2500\u256E"),
+                "header is a single dashed bar");
+        check(header.contains("\u2500 GREED \u2500"), "one dash and a space around GREED");
+        check(!strip(wideLines[1]).contains("\u251C"), "no rule under the header");
+        check(strip(wideLines[1]).contains("SCOREBOARD") && strip(wideLines[1]).contains("ALICE'S TURN"),
+                "scoreboard title is level with the turn title");
+        check(wideLines[1].contains("\u001b[2mSCOREBOARD"), "scoreboard title is dim");
+        check(countChar(wideLines[1], '\u2502') == 3, "the split runs through the status band");
+        check(!strip(wide).contains("to go"), "on-board turn omits the opening line");
+        assertGaps(wide, "wide");
+        assertGaps(Frame.render(hold(), 60, 20), "narrow");
+        assertValueColumn(wide);
+
+        String narrow = Frame.render(hold(), 60, 20);
+        check(narrow.contains("SCORE") && !narrow.contains("HELD 100") && !narrow.contains("SCORESHELD"),
+                "narrow tags are HELD and SCORE");
+        check(wide.contains("HELD 100"), "wide tags keep the point value");
+
+        String off = Frame.render(rollOnly(), 80, 24);
+        String alice = lineContaining(off, "Alice");
+        check(alice.contains("\u00B7\u00B7\u00B7\u00B7\u00B7") && alice.contains("needs 750"),
+                "off the board uses dots and needs");
+        check(!alice.contains(" 0"), "off the board drops the zero score");
+
+        Snapshot set = hold();
+        set.faces = new int[] {4, 1, 4, 4, 2};
+        set.selected = new boolean[5];
+        check(Frame.render(set, 80, 24).contains("Best hold: 4, 4, 4, 1 = 500"), "best hold lists the set first");
+        Snapshot singles = hold();
+        singles.faces = new int[] {5, 1, 5, 2, 3};
+        singles.selected = new boolean[5];
+        check(Frame.render(singles, 80, 24).contains("Best hold: 1, 5, 5 = 200"),
+                "best hold lists 1s before 5s");
+
+        String hint = strip(lineContaining(wide, "1-5"));
+        check(hint.contains("1-5 toggle  a hold best"), "hint pairs are separated by two spaces");
+        check(hint.indexOf('?') > hint.indexOf("confirm"), "rules and quit sit on the right");
+
+        Snapshot empty = hold();
+        empty.selected = new boolean[] {false, false, false, false, false};
+        check("reject".equals(TuiView.press(empty, '\r')), "empty enter is refused");
+        String refused = Frame.render(empty, 80, 24);
+        String summary = lineContaining(refused, "Hold at least one scoring die.");
+        check(summary.contains("\u001b[1;31m"), "empty enter is red in the summary");
+        check("toggle".equals(TuiView.press(empty, '1')), "a die toggle clears the refusal");
+        check(!empty.confirmFailed, "confirm flag clears on toggle");
+        check(!Frame.render(empty, 80, 24).contains("Hold at least one scoring die."),
+                "the refusal leaves the frame");
+    }
+
+    private static void assertGaps(String frame, String label) {
+        String[] lines = frame.split("\n", -1);
+        int die = -1;
+        int selected = -1;
+        for (int i = 0; i < lines.length; i++) {
+            if (die < 0 && strip(lines[i]).contains("\u256D\u2500\u2500\u2500")) {
+                die = i;
+            }
+            if (strip(lines[i]).contains("Selected:")) {
+                selected = i;
+            }
+        }
+        check(die > 0 && blankRow(lines[die - 1]), label + " leaves a blank row above the dice");
+        check(selected > 0 && blankRow(lines[selected - 1]), label + " leaves a blank row above the summary");
+    }
+
+    private static void assertValueColumn(String frame) {
+        String risk = strip(lineContaining(frame, "Hand at risk"));
+        String dice = strip(lineContaining(frame, "Dice to roll"));
+        int riskEnd = risk.lastIndexOf("100") + "100".length();
+        int diceEnd = dice.lastIndexOf("5") + 1;
+        check(riskEnd == diceEnd && riskEnd > 1, "hand and dice values share a column");
+    }
+
+    private static boolean blankRow(String raw) {
+        String text = strip(raw).replace("\u2502", "").replace("|", "");
+        return !strip(raw).contains("\u251C") && text.trim().isEmpty();
+    }
+
+    private static String lineContaining(String frame, String needle) {
+        for (String line : frame.split("\n", -1)) {
+            if (strip(line).contains(needle)) {
+                return line.contains(needle) ? line : strip(line);
+            }
+        }
+        return "";
+    }
+
+    private static int countChar(String text, char needle) {
+        int count = 0;
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == needle) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private static void options() {

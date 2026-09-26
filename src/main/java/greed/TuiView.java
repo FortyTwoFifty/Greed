@@ -420,14 +420,12 @@ final class TuiView implements View {
                 return "hint";
             }
             snap.selected[index] = !snap.selected[index];
-            snap.confirmFailed = false;
-            snap.detail = "";
+            releaseHoldError(snap);
             return "toggle";
         }
         if (key == 'a' || key == 'A') {
             snap.selectOnly(Scorer.scoringIndexes(snap.faces));
-            snap.confirmFailed = false;
-            snap.detail = "";
+            releaseHoldError(snap);
             return "best";
         }
         if (key == '\r' || key == '\n' || key == ' ') {
@@ -446,6 +444,15 @@ final class TuiView implements View {
         }
         snap.log("Use 1-" + Math.max(1, snap.faces.length) + ", a, or Enter");
         return "hint";
+    }
+
+    /** The red summary owns a refusal. A later toggle takes that sentence off the log. */
+    private static void releaseHoldError(Snapshot snap) {
+        if (snap.detail != null && snap.detail.equals(snap.logNewer)) {
+            snap.logNewer = "";
+        }
+        snap.confirmFailed = false;
+        snap.detail = "";
     }
 
     private static String pressTwo(Snapshot snap, int key, char yesKey, String yes, char noKey, String no,
