@@ -34,6 +34,7 @@ final class LineView implements View {
         lines.add("  Three of a kind = face × 100, except three 1s = 1,000");
         lines.add("  Four of a kind = twice the three-of-a-kind score");
         lines.add("  Five of a kind = twice the four-of-a-kind score");
+        lines.add("A set scores only when those dice come from one roll.");
         lines.add("A roll with no 1, 5, or three of a kind is a bust. Unbanked points from the hand are lost.");
         lines.add("If you score every die still in the hand, you roll all 5 again before you can bank.");
         lines.add("The first bank that puts you on the board must be at least " + Scorer.format(openingScore) + ".");
@@ -282,6 +283,11 @@ final class LineView implements View {
         } else {
             out.println("Bust. " + player.name + " scores nothing this turn.");
         }
+    }
+
+    @Override
+    public void doubleReRoll(Player player) {
+        out.println("\"" + player.name + "\" got a double — rolling again.\n");
     }
 
     @Override

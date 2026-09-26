@@ -60,6 +60,9 @@ public interface View {
 
     void bust(Player player, int pointsLost);
 
+    /** Player gets a re-roll because rolling two dice produced a non-scoring double. */
+    void doubleReRoll(Player player);
+
     void banked(Player player, int amount, int scoreBefore, boolean opened);
 
     /**

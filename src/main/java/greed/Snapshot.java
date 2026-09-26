@@ -8,7 +8,7 @@ import java.util.List;
 final class Snapshot {
     enum Phase {
         SETUP_COUNT, SETUP_NAMES,
-        HOLD, BANK_OR_ROLL, ROLL_ONLY, HOT, CONTINUE,
+        HOLD, BANK_OR_ROLL, ROLL_ONLY, HOT, CONTINUE, DOUBLE_REROLL,
         BUST, BANK, WIN
     }
 
