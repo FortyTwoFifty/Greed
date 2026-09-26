@@ -8,8 +8,9 @@ import java.util.Locale;
  * Scores a set of dice the player has chosen to hold.
  * A 1 is 100 and a 5 is 50. Three of a kind is face × 100, except three 1s,
  * which are 1,000. Four of a kind is twice that, and five of a kind is twice
- * the four-of-a-kind value. Leftover 1s and 5s still score. Any other leftover
- * die means the selection is illegal.
+ * the four-of-a-kind value. A full house of all five dice is 1,250, and
+ * 1-2-3-4-5 is 1,500. Either combo replaces the part scores. Leftover 1s and
+ * 5s still score. Any other leftover die means the selection is illegal.
  */
 public final class Scorer {
     public record Scoring(boolean valid, int points, String detail) {
@@ -54,9 +55,12 @@ public final class Scorer {
         return indexes;
     }
 
-    /** True when the roll contains a 1, a 5, or any three of a kind. */
+    /** True when the roll contains a 1, a 5, any three of a kind, a full house, or a straight. */
     public static boolean canScore(int[] faces) {
         int[] counts = counts(faces);
+        if (isStraight(counts) || isFullHouse(counts)) {
+            return true;
+        }
         if (counts[1] > 0 || counts[5] > 0) {
             return true;
         }
@@ -77,6 +81,12 @@ public final class Scorer {
         }
 
         int[] counts = counts(faces);
+        if (faces.length == 5 && isStraight(counts)) {
+            return Scoring.ok(1500, "a straight for 1,500");
+        }
+        if (faces.length == 5 && isFullHouse(counts)) {
+            return Scoring.ok(1250, "a full house for 1,250");
+        }
         int points = 0;
         List<String> parts = new ArrayList<>();
         List<Integer> unscored = new ArrayList<>();
@@ -155,7 +165,36 @@ public final class Scorer {
         return listed + " do not score on their own. Hold 1s, 5s, or at least three of a kind.";
     }
 
+    /** 1-2-3-4-5, one each, and no 6. */
+    static boolean isStraight(int[] counts) {
+        for (int face = 1; face <= 5; face++) {
+            if (counts[face] != 1) {
+                return false;
+            }
+        }
+        return counts[6] == 0;
+    }
+
+    /** One face has three dice, a different face has two, and nothing else is showing. */
+    static boolean isFullHouse(int[] counts) {
+        int threes = 0;
+        int pairs = 0;
+        for (int face = 1; face <= 6; face++) {
+            if (counts[face] == 3) {
+                threes++;
+            } else if (counts[face] == 2) {
+                pairs++;
+            } else if (counts[face] != 0) {
+                return false;
+            }
+        }
+        return threes == 1 && pairs == 1;
+    }
+
     private static boolean isScoringFace(int face, int[] counts) {
+        if (isStraight(counts) || isFullHouse(counts)) {
+            return counts[face] > 0;
+        }
         return face == 1 || face == 5 || counts[face] >= 3;
     }
 

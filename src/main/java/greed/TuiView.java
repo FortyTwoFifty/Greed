@@ -94,7 +94,8 @@ final class TuiView implements View {
             if ("commit".equals(effect)) {
                 Player player = new Player(snap.resultName, snap.resultBot);
                 if (player.computer) {
-                    snap.log(player.name + " sits down for the computer.");
+                    player.personality = Bot.assign();
+                    snap.log(player.label() + " sits down for the computer.");
                 }
                 return player;
             }
@@ -107,12 +108,12 @@ final class TuiView implements View {
 
     @Override
     public void seatComputer(Player player) {
-        snap.log(player.name + " sits down for the computer.");
+        snap.log(player.label() + " sits down for the computer.");
     }
 
     @Override
     public void goesFirst(Player player) {
-        snap.log(player.name + " goes first.");
+        snap.log(player.label() + " goes first.");
     }
 
     @Override
@@ -137,7 +138,7 @@ final class TuiView implements View {
     public void startContinued(Player player, int diceLeft) {
         focus(player);
         snap.diceLeft = diceLeft;
-        snap.log(player.name + " rolls the " + LineView.diceWord(diceLeft) + " left unscored.");
+        snap.log(player.label() + " rolls the " + LineView.diceWord(diceLeft) + " left unscored.");
         redraw();
     }
 
@@ -145,7 +146,7 @@ final class TuiView implements View {
     public void startNewHand(Player player) {
         focus(player);
         snap.diceLeft = 5;
-        snap.log(player.name + " starts a new hand.");
+        snap.log(player.label() + " starts a new hand.");
         redraw();
     }
 
@@ -199,7 +200,7 @@ final class TuiView implements View {
         snap.faces = faces.clone();
         snap.selectOnly(every);
         snap.diceLeft = faces.length;
-        snap.log(player.name + " holds every scoring die.");
+        snap.log(player.label() + " holds every scoring die.");
         snap.log("Held " + preview.detail() + ".");
         redraw();
         botBeat();
@@ -215,7 +216,7 @@ final class TuiView implements View {
         snap.banner = "ALL FIVE SCORED";
         redraw();
         if (player.computer) {
-            snap.log(player.name + " rolls all 5.");
+            snap.log(player.label() + " rolls all 5.");
             redraw();
             botBeat();
             return;
@@ -229,7 +230,7 @@ final class TuiView implements View {
         snap.log(openingBlock(snap));
         redraw();
         if (player.computer) {
-            snap.log(player.name + " rolls the remaining " + LineView.diceWord(left) + ".");
+            snap.log(player.label() + " rolls the remaining " + LineView.diceWord(left) + ".");
             redraw();
             botBeat();
             return;
@@ -241,8 +242,9 @@ final class TuiView implements View {
     public boolean chooseBank(Player player, int hand, int left, int[] kept) {
         arm(player, hand, left, kept, Snapshot.Phase.BANK_OR_ROLL);
         if (player.computer) {
-            Bot.Choice choice = Bot.bank(hand, left, player.onBoard, player.score, snap.opening, snap.winning);
-            snap.log(player.name + " " + choice.reason());
+            Bot.Choice choice = Bot.bank(hand, left, player.onBoard, player.score, snap.opening, snap.winning,
+                    player.personality);
+            snap.log(player.label() + " " + choice.reason());
             redraw();
             botBeat();
             return choice.yes();
@@ -260,8 +262,8 @@ final class TuiView implements View {
         snap.faces = new int[0];
         redraw();
         if (player.computer) {
-            Bot.Choice choice = Bot.cont(diceLeft);
-            snap.log(player.name + " " + choice.reason());
+            Bot.Choice choice = Bot.cont(player.personality, diceLeft, banked, snap.opening);
+            snap.log(player.label() + " " + choice.reason());
             redraw();
             botBeat();
             return choice.yes();
@@ -275,11 +277,11 @@ final class TuiView implements View {
         snap.phase = Snapshot.Phase.BUST;
         snap.pointsLost = pointsLost;
         snap.banner = pointsLost > 0
-                ? "BUST · " + player.name + " loses " + Scorer.format(pointsLost)
+                ? "BUST · " + player.label() + " loses " + Scorer.format(pointsLost)
                 : "BUST · no points this turn";
         snap.log(pointsLost > 0
-                ? "Bust. " + player.name + " loses " + Scorer.format(pointsLost) + " unbanked points."
-                : "Bust. " + player.name + " scores nothing this turn.");
+                ? "Bust. " + player.label() + " loses " + Scorer.format(pointsLost) + " unbanked points."
+                : "Bust. " + player.label() + " scores nothing this turn.");
         redraw();
         if (keys != null) {
             return;
@@ -305,8 +307,11 @@ final class TuiView implements View {
         focus(player);
         snap.phase = Snapshot.Phase.DOUBLE_REROLL;
         snap.banner = "DOUBLE · rolling again";
-        snap.log("\"" + player.name + "\" got a double.");
+        snap.log("\"" + player.label() + "\" got a double.");
         redraw();
+        if (player.computer) {
+            botBeat();
+        }
     }
 
     @Override
@@ -314,7 +319,7 @@ final class TuiView implements View {
         focus(player);
         snap.phase = Snapshot.Phase.BANK;
         snap.opened = opened;
-        snap.banner = "BANKED " + Scorer.format(amount) + " · " + player.name
+        snap.banner = "BANKED " + Scorer.format(amount) + " · " + player.label()
                 + " now has " + Scorer.format(player.score)
                 + (opened ? " · ON THE BOARD" : "");
         snap.log(snap.banner);
@@ -585,11 +590,11 @@ final class TuiView implements View {
         Player player = currentPlayer(snap);
         String who;
         if (player.computer) {
-            who = player.name + " needs ";
+            who = player.label() + " needs ";
         } else if (snap.soleHuman()) {
             who = "You need ";
         } else {
-            who = player.name + " needs ";
+            who = player.label() + " needs ";
         }
         return who + Scorer.format(snap.opening) + " in this hand to get on the board. Banking "
                 + Scorer.format(snap.hand) + " is not allowed yet.";

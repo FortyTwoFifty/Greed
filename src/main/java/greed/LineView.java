@@ -34,12 +34,14 @@ final class LineView implements View {
         lines.add("  Three of a kind = face × 100, except three 1s = 1,000");
         lines.add("  Four of a kind = twice the three-of-a-kind score");
         lines.add("  Five of a kind = twice the four-of-a-kind score");
+        lines.add("  Full house (three of a kind and a pair) = 1,250");
+        lines.add("  Straight (1 2 3 4 5) = 1,500, only on one roll of all five dice");
         lines.add("A set scores only when those dice come from one roll.");
         lines.add("A roll with no 1, 5, or three of a kind is a bust. Unbanked points from the hand are lost.");
         lines.add("If you score every die still in the hand, you roll all 5 again before you can bank.");
         lines.add("The first bank that puts you on the board must be at least " + Scorer.format(openingScore) + ".");
         lines.add("After that you may bank any hand. The next player can roll the dice you left,");
-        lines.add("starting from 0, or throw all 5 dice as a new hand.");
+        lines.add("starting from the points just banked, or throw all 5 dice as a new hand.");
         lines.add("Type bot as a player's name to seat the computer. One player sits with Rook.");
         lines.add("Type ? for these rules, or quit to leave.");
         lines.add("");
@@ -86,8 +88,10 @@ final class LineView implements View {
                     continue;
                 }
                 String botName = Bot.nameFor(seated);
-                out.println(botName + " sits down for the computer.");
-                return new Player(botName, true);
+                Player bot = new Player(botName, true);
+                bot.personality = Bot.assign();
+                out.println(bot.label() + " sits down for the computer.");
+                return bot;
             }
             if (name.isEmpty()) {
                 name = "Player " + seat;
@@ -106,12 +110,12 @@ final class LineView implements View {
 
     @Override
     public void seatComputer(Player player) {
-        out.println(player.name + " sits down for the computer.");
+        out.println(player.label() + " sits down for the computer.");
     }
 
     @Override
     public void goesFirst(Player player) {
-        out.println(player.name + " goes first.");
+        out.println(player.label() + " goes first.");
     }
 
     @Override
@@ -122,17 +126,17 @@ final class LineView implements View {
 
     @Override
     public void startTurn(Player player) {
-        out.println(player.name + "'s turn.");
+        out.println(player.label() + "'s turn.");
     }
 
     @Override
     public void startContinued(Player player, int diceLeft) {
-        out.println(player.name + " rolls the " + diceWord(diceLeft) + " left unscored.");
+        out.println(player.label() + " rolls the " + diceWord(diceLeft) + " left unscored.");
     }
 
     @Override
     public void startNewHand(Player player) {
-        out.println(player.name + " starts a new hand.");
+        out.println(player.label() + " starts a new hand.");
     }
 
     @Override
@@ -186,7 +190,7 @@ final class LineView implements View {
         if (!preview.valid()) {
             throw new IllegalStateException("bot hold did not score: " + preview.detail());
         }
-        out.println(player.name + " holds every scoring die.");
+        out.println(player.label() + " holds every scoring die.");
         out.println("Held " + preview.detail() + ".");
         return every;
     }
@@ -196,7 +200,7 @@ final class LineView implements View {
         out.println("Hand total: " + Scorer.format(hand) + ".");
         out.println("Every die scored. You have to roll all 5 dice again before you can bank.");
         if (player.computer) {
-            out.println(player.name + " rolls all 5.");
+            out.println(player.label() + " rolls all 5.");
         } else {
             acknowledge("Press Enter to roll.");
         }
@@ -206,13 +210,13 @@ final class LineView implements View {
     public void mustRoll(Player player, int hand, int left, int[] kept) {
         out.println("Hand total: " + Scorer.format(hand) + ".");
         out.println(remain(left));
-        String who = player.computer ? player.name : "You";
+        String who = player.computer ? player.label() : "You";
         String verb = player.computer ? " needs " : " need ";
         out.println(who + verb + Scorer.format(openingScore)
                 + " in this hand to get on the board. Banking "
                 + Scorer.format(hand) + " is not allowed yet.");
         if (player.computer) {
-            out.println(player.name + " rolls the remaining " + diceWord(left) + ".");
+            out.println(player.label() + " rolls the remaining " + diceWord(left) + ".");
         } else {
             acknowledge("Press Enter to roll the remaining " + diceWord(left) + ".");
         }
@@ -225,8 +229,9 @@ final class LineView implements View {
         String question = "[R]oll the remaining " + diceWord(left) + ", or [B]ank " + Scorer.format(hand) + "?";
         if (player.computer) {
             out.println(question);
-            Bot.Choice choice = Bot.bank(hand, left, player.onBoard, player.score, openingScore, winningScore);
-            out.println(player.name + " " + choice.reason());
+            Bot.Choice choice = Bot.bank(hand, left, player.onBoard, player.score, openingScore, winningScore,
+                    player.personality);
+            out.println(player.label() + " " + choice.reason());
             return choice.yes();
         }
         while (true) {
@@ -249,11 +254,12 @@ final class LineView implements View {
 
     @Override
     public boolean chooseContinue(Player player, String banker, int diceLeft, int banked) {
-        out.println(player.name + ", " + banker + " left " + diceWord(diceLeft) + " unscored.");
-        out.println("A continued hand starts at 0. " + banker + " keeps the points just banked.");
+        out.println(player.label() + ", " + banker + " left " + diceWord(diceLeft) + " unscored.");
+        out.println("A continued hand starts at " + Scorer.format(banked) + ". "
+                + banker + " keeps the points just banked.");
         if (player.computer) {
-            Bot.Choice choice = Bot.cont(diceLeft);
-            out.println(player.name + " " + choice.reason());
+            Bot.Choice choice = Bot.cont(player.personality, diceLeft, banked, openingScore);
+            out.println(player.label() + " " + choice.reason());
             return choice.yes();
         }
         while (true) {
@@ -279,31 +285,31 @@ final class LineView implements View {
     public void bust(Player player, int pointsLost) {
         out.println("No 1, no 5, and no three of a kind.");
         if (pointsLost > 0) {
-            out.println("Bust. " + player.name + " loses " + Scorer.format(pointsLost) + " unbanked points.");
+            out.println("Bust. " + player.label() + " loses " + Scorer.format(pointsLost) + " unbanked points.");
         } else {
-            out.println("Bust. " + player.name + " scores nothing this turn.");
+            out.println("Bust. " + player.label() + " scores nothing this turn.");
         }
     }
 
     @Override
     public void doubleReRoll(Player player) {
-        out.println("\"" + player.name + "\" got a double — rolling again.\n");
+        out.println("\"" + player.label() + "\" got a double — rolling again.\n");
     }
 
     @Override
     public void banked(Player player, int amount, int scoreBefore, boolean opened) {
-        out.println(player.name + " banks " + Scorer.format(amount) + " points.");
+        out.println(player.label() + " banks " + Scorer.format(amount) + " points.");
         if (opened) {
-            out.println(player.name + " gets on the board with " + Scorer.format(player.score) + ".");
+            out.println(player.label() + " gets on the board with " + Scorer.format(player.score) + ".");
         } else {
-            out.println(player.name + " now has " + Scorer.format(player.score) + ".");
+            out.println(player.label() + " now has " + Scorer.format(player.score) + ".");
         }
     }
 
     @Override
     public boolean win(Player winner, List<Player> players) {
         out.println();
-        out.println(winner.name + " wins with " + Scorer.format(winner.score) + " points.");
+        out.println(winner.label() + " wins with " + Scorer.format(winner.score) + " points.");
         out.println();
         printScores(players);
         return false;
@@ -340,7 +346,7 @@ final class LineView implements View {
     private void printScores(List<Player> players) {
         int nameWidth = 0;
         for (Player player : players) {
-            nameWidth = Math.max(nameWidth, player.name.length());
+            nameWidth = Math.max(nameWidth, player.label().length());
         }
         out.println("Scoreboard");
         for (Player player : players) {
@@ -351,7 +357,7 @@ final class LineView implements View {
                 standing = standing + " · bot";
             }
             out.printf(Locale.US, "  %-" + nameWidth + "s  %7s   %s%n",
-                    player.name, Scorer.format(player.score), standing);
+                    player.label(), Scorer.format(player.score), standing);
         }
         out.println();
     }

@@ -12,7 +12,8 @@ import java.util.Random;
  * Console game of Greed for two or more players.
  * A turn that scores every die still in hand must roll all five again
  * before banking. The next player may roll dice the banker left unscored;
- * that continued hand starts at zero and can itself be passed on.
+ * that continued hand starts at the banked total and can itself be passed on.
+ * A bust loses it.
  */
 public final class Game {
     public static final int WINNING_SCORE = 10_000;
@@ -22,16 +23,29 @@ public final class Game {
     private final DieSource dice;
     private final int winningScore;
     private final int openingScore;
+    private final Random random;
 
     public Game(Reader in, Writer out, DieSource dice) {
-        this(in, out, dice, WINNING_SCORE, OPENING_SCORE);
+        this(in, out, dice, WINNING_SCORE, OPENING_SCORE, new Random(0));
+    }
+
+    public Game(Reader in, Writer out, DieSource dice, Random random) {
+        this(in, out, dice, WINNING_SCORE, OPENING_SCORE, random);
     }
 
     public Game(Reader in, Writer out, DieSource dice, int winningScore, int openingScore) {
-        this(new LineView(in, out, winningScore, openingScore), dice, winningScore, openingScore);
+        this(in, out, dice, winningScore, openingScore, new Random(0));
+    }
+
+    public Game(Reader in, Writer out, DieSource dice, int winningScore, int openingScore, Random random) {
+        this(new LineView(in, out, winningScore, openingScore), dice, winningScore, openingScore, random);
     }
 
     public Game(View view, DieSource dice, int winningScore, int openingScore) {
+        this(view, dice, winningScore, openingScore, new Random(0));
+    }
+
+    public Game(View view, DieSource dice, int winningScore, int openingScore, Random random) {
         if (openingScore <= 0 || winningScore < openingScore) {
             throw new IllegalArgumentException("winning score must be at least the opening score");
         }
@@ -39,6 +53,7 @@ public final class Game {
         this.dice = dice;
         this.winningScore = winningScore;
         this.openingScore = openingScore;
+        this.random = random;
     }
 
     public static void main(String[] args) {
@@ -50,9 +65,10 @@ public final class Game {
             System.exit(2);
             return;
         }
-        DieSource dice = new RandomDice(new Random());
+        Random random = new Random();
+        DieSource dice = new RandomDice(random);
         if (options.plain || System.console() == null) {
-            new Game(new InputStreamReader(System.in), new OutputStreamWriter(System.out), dice).play();
+            new Game(new InputStreamReader(System.in), new OutputStreamWriter(System.out), dice, random).play();
             return;
         }
         Terminal terminal = new Terminal();
@@ -60,7 +76,7 @@ public final class Game {
             terminal.enter();
         } catch (RuntimeException failed) {
             terminal.restore();
-            new Game(new InputStreamReader(System.in), new OutputStreamWriter(System.out), dice).play();
+            new Game(new InputStreamReader(System.in), new OutputStreamWriter(System.out), dice, random).play();
             return;
         }
         terminal.installHooks();
@@ -68,7 +84,7 @@ public final class Game {
             boolean again = true;
             while (again) {
                 TuiView view = new TuiView(terminal, options, WINNING_SCORE, OPENING_SCORE);
-                again = new Game(view, dice, WINNING_SCORE, OPENING_SCORE).play();
+                again = new Game(view, dice, WINNING_SCORE, OPENING_SCORE, random).play();
             }
         } finally {
             terminal.restore();
@@ -89,6 +105,7 @@ public final class Game {
     }
 
     private List<Player> readPlayers() {
+        Bot.source = random;
         int count = view.readPlayerCount();
         if (count == 1) {
             view.soloAgainstComputer();
@@ -99,6 +116,7 @@ public final class Game {
         }
         if (count == 1) {
             Player rook = new Player(Bot.nameFor(players), true);
+            rook.personality = Bot.assign();
             players.add(rook);
             view.seatComputer(rook);
         }
@@ -112,11 +130,13 @@ public final class Game {
         while (true) {
             Player player = players.get(current);
             view.scores(players);
+            int carried = 0;
             int diceToRoll = 5;
             if (pending != null) {
                 if (view.chooseContinue(player, pending.banker, pending.diceLeft, pending.banked)) {
                     view.startContinued(player, pending.diceLeft);
                     diceToRoll = pending.diceLeft;
+                    carried = pending.banked;
                 } else {
                     view.startNewHand(player);
                 }
@@ -125,7 +145,7 @@ public final class Game {
                 view.startTurn(player);
             }
 
-            Turn turn = playTurn(player, diceToRoll);
+            Turn turn = playTurn(player, diceToRoll, carried);
             if (turn.busted) {
                 view.bust(player, turn.pointsLost);
                 current = next(current, players.size());
@@ -142,18 +162,17 @@ public final class Game {
             if (player.score >= winningScore) {
                 return view.win(player, players);
             }
-            pending = new Pending(player.name, turn.diceLeft, turn.banked);
+            pending = new Pending(player.label(), turn.diceLeft, turn.banked);
             current = next(current, players.size());
         }
     }
 
-    private Turn playTurn(Player player, int diceCount) {
-        int hand = 0;
+    private Turn playTurn(Player player, int diceCount, int hand) {
         int[] kept = new int[0];
         while (true) {
             int[] roll = dice.roll(diceCount);
             view.showRoll(player, hand, roll, kept);
-            if (diceCount == 2 && isNonScoringDouble(roll) && !player.computer) {
+            if (diceCount == 2 && isNonScoringDouble(roll)) {
                 view.doubleReRoll(player);
                 continue;
             }

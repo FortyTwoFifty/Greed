@@ -41,7 +41,26 @@ public final class TuiTest {
         String setup = Frame.render(countSnap(), 60, 20);
         assertFrame(setup, 60, 20, "setup");
         check(setup.contains("1 = 100"), "cheat sheet shows 1 = 100");
-        check(setup.contains("0 = 10"), "zero means ten players");
+        check(setup.contains("How many players?"), "setup asks how many players");
+        check(setup.contains("0 ten"), "zero means ten players");
+        check(!setup.contains("0 = 10"), "setup hint does not repeat a bracket count");
+        check(setup.contains("A set scores only when those dice come from one roll."),
+                "setup says a set comes from one roll");
+        check(!setup.contains("straight") && !setup.contains("full house"),
+                "setup legend has no straight or full house");
+        check(setup.contains("\u2588"), "setup banner uses the block font");
+        String ask = strip(lineContaining(setup, "How many players?"));
+        check(ask.indexOf("How many players?") > 8, "setup prompt is centered");
+        String setupHint = lineContaining(setup, "0 ten");
+        check(strip(setupHint).contains("1-9 players  0 ten  q quit"), "setup hint is one key row");
+        check(setupHint.contains("\u001b[1m0") && setupHint.contains("\u001b[2m ten"),
+                "setup hint styles the key and the label");
+        Snapshot plainCount = countSnap();
+        plainCount.unicode = false;
+        String asciiSetup = Frame.render(plainCount, 80, 24);
+        assertFrame(asciiSetup, 80, 24, "setup ascii");
+        check(asciiSetup.contains("#") && !asciiSetup.contains("\u2588"),
+                "plain setup banner uses hash marks");
     }
 
     private static void narrowAndWide() {
@@ -71,16 +90,39 @@ public final class TuiTest {
         check(only.contains("need 750"), "banking closed shows the opening score");
 
         String hot = Frame.render(hot(), 80, 24);
-        check(hot.contains("ALL FIVE SCORED"), "hot dice banner");
+        check(countOf(hot, "ALL FIVE SCORED") == 1, "hot dice banner is only on the summary");
+        check(lineContaining(hot, "ALL FIVE SCORED").contains("\u001b[1;33m"), "hot banner is bold yellow");
+        check(hot.contains("\u2605 ALL FIVE SCORED \u00B7 roll all 5 again \u2605"), "hot banner text");
         check(hot.contains("r/\u23CE"), "hot dice rolls on r or enter");
+        check(!hot.contains("\u25CF"), "unrolled hot dice are blank");
+        String wideDie = "\u256D\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256E";
+        check(countOf(strip(hot), wideDie) == 5, "hot dice stay large");
+        check(hot.contains("\u2502       \u2502"), "hot dice show an empty face");
 
         String cont = Frame.render(continued(), 80, 24);
-        check(cont.contains("Rook") && cont.contains("left"), "leftover dice name the banker");
-        check(cont.contains("c") && cont.contains("new hand"), "continue keys");
-        check(cont.contains("keeps the") && cont.contains("600"), "continued hand shows the banked points");
+        check(cont.contains("CONTINUING ROOK'S 2 DICE"), "continue title names the banker");
+        String carried = strip(lineContaining(cont, "Starts at 600"));
+        check(carried.contains("Rook keeps 600"), "continue turn is one line");
+        check(cont.contains("Continue Rook's 2 dice from 600, or start a new hand with 5"),
+                "continue summary");
+        check(cont.contains("continue (2)") && cont.contains("new hand (5)"), "continue hint");
+        check(!cont.contains("Selected") && !cont.contains("keeps the") && !cont.contains("left"),
+                "continue drops the floating copy");
+        check(!cont.contains("rolls"), "continue does not announce a roll");
+        check(countOf(strip(cont), wideDie) == 2, "continued dice stay large");
+        check(!cont.contains("\u25CF"), "continued dice are blank");
+        int holdRow = firstDieRow(Frame.render(hold(), 80, 24));
+        check(holdRow == firstDieRow(hot) && holdRow == firstDieRow(cont),
+                "hot and continue dice stay on the hold row");
 
         String bust = Frame.render(bust(), 80, 24);
-        check(bust.contains("BUST") && bust.contains("\u2717"), "bust word and mark");
+        check(bust.contains("BUST \u00B7 Alice loses 1,150"), "bust summary names the loss");
+        check(lineContaining(bust, "BUST").contains("\u001b[1;31m"), "bust summary is bold red");
+        check(bust.contains("Hand lost") && !bust.contains("Hand at risk"), "bust says the hand was lost");
+        String lost = lineContaining(bust, "Hand lost");
+        check(lost.contains("\u001b[1;31m"), "lost amount is bold red");
+        check(strip(lost).endsWith("1,150 \u2502"), "lost amount is on the right");
+        check(bust.contains("\u25CF") && !bust.contains("\u2717"), "bust dice keep their pips");
         String bank = Frame.render(banked(), 80, 24);
         check(bank.contains("BANKED") && bank.contains("ON THE BOARD"), "bank banner");
     }
@@ -171,6 +213,20 @@ public final class TuiTest {
         check(cont.phase == Snapshot.Phase.CONTINUE, "continue phase stays");
         check("continue".equals(TuiView.press(continued(), 'c')), "c continues");
         check("new".equals(TuiView.press(continued(), 'N')), "n starts a new hand");
+        ArrayDeque<Integer> continueKeys = new ArrayDeque<>();
+        continueKeys.add((int) 'c');
+        TuiView continueView = TuiView.scripted(continueKeys, 80, 24, true, true);
+        Player brandon = new Player("Brandon", false);
+        continueView.scores(List.of(brandon, new Player("Rook", true)));
+        check(continueView.chooseContinue(brandon, "Rook", 2, 600), "c continues from the script");
+        check(!continueView.frames().isEmpty(), "continue draws a frame before the choice");
+        boolean announcedRoll = false;
+        for (String frame : continueView.frames()) {
+            if (strip(frame).contains("rolls")) {
+                announcedRoll = true;
+            }
+        }
+        check(!announcedRoll, "the log does not roll before continue is chosen");
 
         check("roll".equals(TuiView.press(hot(), 'r')), "hot dice accept r");
         check("roll".equals(TuiView.press(hot(), '\r')), "hot dice accept enter");
@@ -206,7 +262,8 @@ public final class TuiTest {
         check(mono.contains("HELD") && mono.contains("SCORES") && mono.contains("[bot]"),
                 "held, scoring, and bot survive without color");
         String bust = Frame.render(bustPlain(), 80, 24);
-        check(bust.contains("BUST") && bust.contains("\u2717"), "bust is a word and a mark");
+        check(bust.contains("BUST") && bust.contains("Hand lost") && !bust.contains("\u2717"),
+                "bust is a word without a cross");
         String bank = Frame.render(bankPlain(), 80, 24);
         check(bank.contains("BANKED"), "bank is a word");
 
@@ -252,14 +309,30 @@ public final class TuiTest {
         String standings = Frame.render(victory, 60, 20);
         assertFrame(standings, 60, 20, "win");
         check(standings.contains(name), "win screen keeps the full name");
-        check(standings.contains("WINS"), "win banner");
-        check(standings.contains("n new game"), "new game key");
+        check(standings.contains("\u2588"), "win banner uses the block font");
+        check(!standings.contains("WINS"), "win banner is the block font");
+        String winnerRow = lineContaining(standings, "\u2605");
+        check(winnerRow.contains(name) && winnerRow.contains("\u001b[1m"), "winner row is bold");
+        check(strip(winnerRow).indexOf('\u2605') > 4, "winner row is centered");
+        check(strip(winnerRow).replace("\u2502", "").trim().codePointCount(0,
+                strip(winnerRow).replace("\u2502", "").trim().length()) == 40,
+                "standings are 40 columns");
+        int winBanner = firstRow(standings, "\u2588");
+        check(winBanner > 3, "win block is centered vertically");
+        String winHint = lineContaining(standings, "new game");
+        check(strip(winHint).contains("n new game  q quit"), "win hint separates the pairs");
+        check(winHint.contains("\u001b[1mn") && winHint.contains("\u001b[2m new game"),
+                "win hint styles the key and the label");
+        Snapshot asciiWin = win();
+        asciiWin.unicode = false;
+        String hashWin = Frame.render(asciiWin, 80, 24);
+        check(hashWin.contains("#") && !hashWin.contains("\u2588"), "plain win banner uses hash marks");
 
         Snapshot crowd = new Snapshot();
         crowd.unicode = true;
         crowd.color = true;
         crowd.phase = Snapshot.Phase.HOLD;
-        crowd.faces = new int[] {1, 5, 2, 3, 4};
+        crowd.faces = new int[] {1, 5, 2, 3, 6};
         crowd.selected = new boolean[] {true, false, false, false, false};
         crowd.hand = 100;
         crowd.diceLeft = 5;
@@ -280,9 +353,9 @@ public final class TuiTest {
                 all = false;
             }
         }
-        if (!all) {
-            check(packed.contains("more"), "hidden players are counted");
-        }
+        check(!all && packed.contains("+5 more"), "ten players at 60x20 window the rest");
+        check(packed.contains("\u001b[2mSCOREBOARD"), "windowed scoreboard keeps the dim title");
+        check(lineContaining(packed, "+5 more").contains("\u001b[2m"), "the extra count is dim");
         assertFrame(Frame.render(crowd, 80, 24), 80, 24, "ten players wide");
     }
 
@@ -293,6 +366,11 @@ public final class TuiTest {
         assertFrame(frame, 80, 24, "rules");
         check(frame.contains("Three of a kind"), "rules include the set scores");
         check(frame.contains("1 = 100"), "rules include single scoring");
+        check(frame.contains("come from one roll"), "rules say a set comes from one roll");
+        check(frame.contains("Full house (three of a kind and a pair) = 1,250"),
+                "rules include a full house");
+        check(frame.contains("Straight (1 2 3 4 5) = 1,500"),
+                "rules include a straight");
         check(frame.contains("esc"), "rules say how to close");
         assertFrame(Frame.render(snap, 60, 20), 60, 20, "rules narrow");
     }
@@ -309,7 +387,8 @@ public final class TuiTest {
                 "scoreboard title is level with the turn title");
         check(wideLines[1].contains("\u001b[2mSCOREBOARD"), "scoreboard title is dim");
         check(countChar(wideLines[1], '\u2502') == 3, "the split runs through the status band");
-        check(!strip(wide).contains("to go"), "on-board turn omits the opening line");
+        check(!strip(wide).contains("to go") && !strip(wide).contains("to get on"),
+                "on-board turn omits the opening line");
         assertGaps(wide, "wide");
         assertGaps(Frame.render(hold(), 60, 20), "narrow");
         assertValueColumn(wide);
@@ -324,6 +403,17 @@ public final class TuiTest {
         check(alice.contains("\u00B7\u00B7\u00B7\u00B7\u00B7") && alice.contains("needs 750"),
                 "off the board uses dots and needs");
         check(!alice.contains(" 0"), "off the board drops the zero score");
+        check(off.contains("350 more to get on"), "a partial hand says how many more");
+        check(!off.contains("to go") && !off.contains("Needs 750"), "need line does not repeat the opening");
+        Snapshot fresh = rollOnly();
+        fresh.hand = 0;
+        check(Frame.render(fresh, 80, 24).contains("Needs 750 to get on"),
+                "a scoreless hand names the opening score");
+        Snapshot enough = rollOnly();
+        enough.hand = 800;
+        String opened = Frame.render(enough, 80, 24);
+        check(!opened.contains("to get on") && !opened.contains("to go"),
+                "a hand that can open omits the need line");
 
         Snapshot set = hold();
         set.faces = new int[] {4, 1, 4, 4, 2};
@@ -334,6 +424,23 @@ public final class TuiTest {
         singles.selected = new boolean[5];
         check(Frame.render(singles, 80, 24).contains("Best hold: 1, 5, 5 = 200"),
                 "best hold lists 1s before 5s");
+
+        Snapshot straight = hold();
+        straight.faces = new int[] {1, 2, 3, 4, 5};
+        straight.selected = new boolean[] {false, false, false, false, false};
+        check("best".equals(TuiView.press(straight, 'a')), "a holds a straight");
+        check(straight.selected[0] && straight.selected[1] && straight.selected[2]
+                        && straight.selected[3] && straight.selected[4],
+                "a selects every die of a straight");
+        Snapshot house = hold();
+        house.faces = new int[] {3, 3, 3, 2, 2};
+        house.selected = new boolean[] {false, false, false, false, false};
+        check("best".equals(TuiView.press(house, 'a')), "a holds a full house");
+        check(house.selected[0] && house.selected[1] && house.selected[2]
+                        && house.selected[3] && house.selected[4],
+                "a selects every die of a full house");
+        check(Frame.render(house, 80, 24).contains("Best hold: 3, 3, 3, 2, 2 = 1,250"),
+                "full house best hold lists the set, then the pair");
 
         String hint = strip(lineContaining(wide, "1-5"));
         check(hint.contains("1-5 toggle  a hold best"), "hint pairs are separated by two spaces");
@@ -349,6 +456,21 @@ public final class TuiTest {
         check(!empty.confirmFailed, "confirm flag clears on toggle");
         check(!Frame.render(empty, 80, 24).contains("Hold at least one scoring die."),
                 "the refusal leaves the frame");
+
+        Snapshot carried = hold();
+        carried.hand = 4_000;
+        carried.faces = new int[] {3, 3, 3, 2, 4};
+        carried.selected = new boolean[] {true, true, true, false, false};
+        String added = strip(lineContaining(Frame.render(carried, 80, 24), "Hand at risk"));
+        check(added.contains("4,300"), "hand at risk adds a valid selection to the carried total");
+        carried.selected = new boolean[] {false, false, false, false, false};
+        String onlyCarried = strip(lineContaining(Frame.render(carried, 80, 24), "Hand at risk"));
+        check(onlyCarried.contains("4,000") && !onlyCarried.contains("4,300"),
+                "an empty selection shows the carried total");
+        carried.selected = new boolean[] {false, false, false, true, false};
+        String illegal = strip(lineContaining(Frame.render(carried, 80, 24), "Hand at risk"));
+        check(illegal.contains("4,000") && !illegal.contains("4,300"),
+                "an illegal selection shows the carried total");
     }
 
     private static void assertGaps(String frame, String label) {
@@ -365,19 +487,49 @@ public final class TuiTest {
         }
         check(die > 0 && blankRow(lines[die - 1]), label + " leaves a blank row above the dice");
         check(selected > 0 && blankRow(lines[selected - 1]), label + " leaves a blank row above the summary");
+        check(strip(lines[die]).startsWith("\u2502 "), label + " pads the dice one column");
     }
 
     private static void assertValueColumn(String frame) {
         String risk = strip(lineContaining(frame, "Hand at risk"));
         String dice = strip(lineContaining(frame, "Dice to roll"));
-        int riskEnd = risk.lastIndexOf("100") + "100".length();
+        int riskEnd = risk.lastIndexOf("200") + "200".length();
         int diceEnd = dice.lastIndexOf("5") + 1;
-        check(riskEnd == diceEnd && riskEnd > 1, "hand and dice values share a column");
+        check(risk.endsWith("200 \u2502") && riskEnd == diceEnd && riskEnd > 1,
+                "hand at risk includes the selected 1 and shares the value column");
     }
 
     private static boolean blankRow(String raw) {
         String text = strip(raw).replace("\u2502", "").replace("|", "");
         return !strip(raw).contains("\u251C") && text.trim().isEmpty();
+    }
+
+    private static int countOf(String text, String needle) {
+        int count = 0;
+        int from = 0;
+        while (from <= text.length()) {
+            int at = text.indexOf(needle, from);
+            if (at < 0) {
+                return count;
+            }
+            count++;
+            from = at + needle.length();
+        }
+        return count;
+    }
+
+    private static int firstDieRow(String frame) {
+        return firstRow(frame, "\u256D\u2500\u2500\u2500");
+    }
+
+    private static int firstRow(String frame, String needle) {
+        String[] lines = frame.split("\n", -1);
+        for (int i = 0; i < lines.length; i++) {
+            if (strip(lines[i]).contains(needle)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static String lineContaining(String frame, String needle) {
@@ -443,7 +595,7 @@ public final class TuiTest {
         Player rook = new Player("Rook", true);
         snap.players = new ArrayList<>(List.of(alice, rook));
         snap.current = 0;
-        snap.faces = new int[] {1, 5, 2, 3, 4};
+        snap.faces = new int[] {1, 5, 2, 3, 6};
         snap.selected = new boolean[] {true, false, false, false, false};
         snap.hand = 100;
         snap.diceLeft = 5;

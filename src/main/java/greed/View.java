@@ -53,7 +53,7 @@ public interface View {
 
     /**
      * Prints the continue preamble and asks.
-     * {@code banked} is for the screen sentence. The line transcript ignores the amount.
+     * {@code banked} is the total the continued hand starts at. Both views use it.
      * @return true to take the leftover dice
      */
     boolean chooseContinue(Player player, String banker, int diceLeft, int banked);
