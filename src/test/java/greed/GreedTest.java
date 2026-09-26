@@ -99,7 +99,8 @@ public final class GreedTest {
 
     private static void banksOpeningHandAndWins() {
         Run run = play(2_000, 750, lines("2", "Alice", "Bob", "1 2 3 4", "b"),
-                new int[] {1, 1, 1, 1, 2});
+                new int[] {1, 1, 1, 1, 2},
+                new int[] {2, 3, 4, 4, 5});
         run.dice.assertDrained();
         expect(run.output, "Held four 1s for 2,000.");
         expect(run.output, "Alice banks 2,000 points.");
@@ -110,7 +111,8 @@ public final class GreedTest {
     private static void rejectsBankBelowOpeningThenWins() {
         Run run = play(1_050, 750, lines("2", "Alice", "Bob", "all", "b", "", "all", "b"),
                 new int[] {5, 2, 3, 4, 6},
-                new int[] {1, 1, 1, 2});
+                new int[] {1, 1, 1, 2},
+                new int[] {2, 3, 4, 4, 6});
         run.dice.assertDrained();
         expect(run.output, "You cannot bank on this roll.");
         expect(run.output, "You need 750 in this hand");
@@ -122,7 +124,8 @@ public final class GreedTest {
         Run run = play(1_000, 750, lines("2", "Alice", "Bob", "all", "", "all", "b"),
                 new int[] {1, 1, 1, 5, 5},
                 new int[] {2, 3, 4, 6, 6},
-                new int[] {1, 1, 1, 1, 2});
+                new int[] {1, 1, 1, 1, 2},
+                new int[] {2, 3, 4, 6, 6});
         run.dice.assertDrained();
         expect(run.output, "Every die scored. You have to roll all 5 dice again before you can bank.");
         expect(run.output, "Bust. Alice loses 1,250 unbanked points.");
@@ -229,7 +232,8 @@ public final class GreedTest {
     private static void soloHumanGetsRook() {
         Run run = playAs(Bot.Personality.STEADY, 2_000, 750, lines("1", "Ada"),
                 new int[] {2, 3, 4, 6, 6},
-                new int[] {1, 1, 1, 1, 2});
+                new int[] {1, 1, 1, 1, 2},
+                new int[] {2, 3, 4, 6, 6});
         run.dice.assertDrained();
         expect(run.output, ROOK + " sits down for the computer.");
         expect(run.output, "Bust. Ada scores nothing this turn.");
@@ -391,7 +395,8 @@ public final class GreedTest {
         Bot.Personality first = Bot.Personality.pick(probe);
         Bot.Personality second = Bot.Personality.pick(probe);
         Run run = play(500, 100, lines("2", "bot", "bot"), new Random(99),
-                new int[] {1, 1, 1, 1, 2});
+                new int[] {1, 1, 1, 1, 2},
+                new int[] {2, 3, 4, 6, 6});
         run.dice.assertDrained();
         expect(run.output, "Rook (" + first.adjective() + ") sits down for the computer.");
         expect(run.output, "Rook 2 (" + second.adjective() + ") sits down for the computer.");

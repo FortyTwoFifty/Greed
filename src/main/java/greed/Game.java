@@ -160,10 +160,81 @@ public final class Game {
             }
             view.banked(player, turn.banked, scoreBefore, opened);
             if (player.score >= winningScore) {
-                return view.win(player, players);
+                return endGame(players, current, winningScore);
             }
             pending = new Pending(player.label(), turn.diceLeft, turn.banked);
             current = next(current, players.size());
+        }
+    }
+
+    /** When a player crosses the threshold, give every other player one final turn.
+     *  The leader is only declared once all others have had their shot.
+     *  The final turn is forced: all scoring dice are held, rest are kept, the hand is banked. */
+    private boolean endGame(List<Player> players, int leaderIdx, int winningScore) {
+        Player leader = players.get(leaderIdx);
+
+        // Store leader's score (leader doesn't play a final turn)
+        int leaderScore = leader.score;
+
+        // Let every other player one final turn
+        int first = next(leaderIdx, players.size());
+        int round = 0;
+        int roundMax = players.size() - 1;
+        for (int i = first; round < roundMax; i = next(i, players.size()), round++) {
+            int other = i % players.size();
+            if (other == leaderIdx) {
+                other = next(other, players.size());
+            }
+            Player opponent = players.get(other);
+            Turn turn = playTurnForced(opponent, 5, 0);
+            if (turn.busted) {
+                view.bust(opponent, turn.pointsLost);
+                continue;
+            }
+            opponent.score += turn.banked;
+            view.banked(opponent, turn.banked, 0, false);
+            if (opponent.score > leaderScore) {
+                leader = opponent;
+                leaderScore = opponent.score;
+            }
+        }
+
+        return view.win(leader, players);
+    }
+
+    /** Like {@link #playTurn} but forces the player to hold every scoring die and bank immediately.
+     *  This is used for end-game final turns where no user input is available. */
+    private Turn playTurnForced(Player player, int diceCount, int hand) {
+        int[] kept = new int[0];
+        while (true) {
+            int[] roll = dice.roll(diceCount);
+            view.showRoll(player, hand, roll, kept);
+            if (diceCount == 2 && isNonScoringDouble(roll)) {
+                view.doubleReRoll(player);
+                continue;
+            }
+            if (!Scorer.canScore(roll)) {
+                return Turn.bust(hand);
+            }
+
+            int[] held = Scorer.scoringIndexes(roll);
+            Scorer.Scoring scoring = Scorer.score(LineView.facesAt(roll, held));
+            if (!scoring.valid()) {
+                throw new IllegalStateException("forced hold did not score: " + scoring.detail());
+            }
+            hand += scoring.points();
+            kept = concat(kept, LineView.facesAt(roll, held));
+            int left = diceCount - held.length;
+
+            if (left == 0) {
+                view.hotDice(player, hand);
+                diceCount = 5;
+                kept = new int[0];
+                continue;
+            }
+
+            // Force bank: bank the current total, leave remaining dice
+            return Turn.bank(hand, left);
         }
     }
 
