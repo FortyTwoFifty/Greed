@@ -216,6 +216,57 @@ public final class GreedTest {
         check(!run.output.contains("Rook banks"), "a hot-dice bust banks nothing");
     }
 
+    private static void doubleOnTwoDiceGivesAReroll() {
+        // Non-scoring doubles on faces 2, 3, 4, 6 should all reroll (no bust).
+        assertTrue(outputForDoubleReroll(5_000, 100, "You", new int[]{2, 2}), "\" You \" got a double");
+        assertTrue(outputForDoubleReroll(5_000, 100, "You", new int[]{3, 3}), "\" You \" got a double");
+        assertTrue(outputForDoubleReroll(5_000, 100, "You", new int[]{4, 4}), "\" You \" got a double");
+        assertTrue(outputForDoubleReroll(5_000, 100, "You", new int[]{6, 6}), "\" You \" got a double");
+
+        // Non-double non-scoring two dice still bust (no reroll message).
+        assertFalse(outputForDoubleReroll(5_000, 100, "You", new int[]{2, 3}), "\" You \" got a double");
+
+        // Scoring doubles are held normally (double-1 = 200, double-5 = 100), no reroll.
+        assertFalse(outputForDoubleReroll(5_000, 100, "You", new int[]{1, 1}), "\" You \" got a double");
+        assertFalse(outputForDoubleReroll(5_000, 100, "You", new int[]{5, 5}), "\" You \" got a double");
+
+        // After a reroll that scores, the player can bank.
+        Run banking = play(5_000, 100, lines("2", "You", "all", "b"),
+                new int[]{6, 6},   // non-scoring double → reroll message printed
+                new int[]{3, 5});  // scores (5=50), held as one hand
+        banking.dice.assertDrained();
+        check(banking.output.contains("\" You \" got a double"), "banking test shows double message");
+    }
+
+    private static String outputForDoubleReroll(int winning, int opening, String name, int[] rerollFace) {
+        // When the double triggers a reroll, Game calls dice.roll(2) again for the second round.
+        // Give two rolls: first produces the double, second produces whatever (even non-scoring).
+        ScriptedDice dice = new ScriptedDice(rerollFace, new int[]{3, 4});
+        StringWriter out = new StringWriter();
+        String input = name + "\nall\nb\nquit\n";
+        Game game = new Game(new java.io.StringReader(input), out, dice, winning, opening);
+        try {
+            game.play();
+        } catch (Quit | java.io.UncheckedIOException e) {}
+        return out.toString();
+    }
+
+    private static void assertFalse(String output, String shouldNotContain) {
+        if (output.contains(shouldNotContain)) {
+            failed++;
+            System.out.println("FAIL: output unexpectedly contains '" + shouldNotContain + "'");
+            System.out.println("---\n" + output);
+        }
+    }
+
+    private static void assertTrue(String output, String shouldContain) {
+        if (!output.contains(shouldContain)) {
+            failed++;
+            System.out.println("FAIL: output missing '" + shouldContain + "'");
+            System.out.println("---\n" + output);
+        }
+    }
+
     private static int scoreOf(int[] roll, int[] indexes) {
         int[] faces = new int[indexes.length];
         for (int i = 0; i < indexes.length; i++) {
