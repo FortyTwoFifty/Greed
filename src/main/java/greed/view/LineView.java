@@ -1,4 +1,4 @@
-package greed;
+package greed.view;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -9,14 +9,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import greed.rules.Bot;
+import greed.rules.Player;
+import greed.rules.Quit;
+import greed.rules.Scorer;
+import greed.rules.View;
+
 /** Today's scrolling transcript. Strings here are the ones {@code GreedTest} matches. */
-final class LineView implements View {
+public final class LineView implements View {
     private final BufferedReader in;
     private final PrintWriter out;
     private final int winningScore;
     private final int openingScore;
 
-    LineView(Reader in, Writer out, int winningScore, int openingScore) {
+    public LineView(Reader in, Writer out, int winningScore, int openingScore) {
         this.in = in instanceof BufferedReader buffered ? buffered : new BufferedReader(in);
         this.out = out instanceof PrintWriter printer ? printer : new PrintWriter(out, true);
         this.winningScore = winningScore;
@@ -82,7 +88,7 @@ final class LineView implements View {
         while (true) {
             prompt("Name for player " + seat + " (bot seats the computer): ");
             String name = readLine();
-            if (isBotToken(name)) {
+            if (Snapshot.isBotToken(name)) {
                 if (onlyHuman) {
                     out.println("Type your name. Rook takes the other seat.");
                     continue;
@@ -100,7 +106,7 @@ final class LineView implements View {
                 out.println("Use 24 characters or fewer.");
                 continue;
             }
-            if (taken(seated, name)) {
+            if (Player.taken(seated, name)) {
                 out.println(name + " is already in the game.");
                 continue;
             }
@@ -406,20 +412,7 @@ final class LineView implements View {
         out.flush();
     }
 
-    private static boolean taken(List<Player> players, String name) {
-        for (Player player : players) {
-            if (player.name.equalsIgnoreCase(name)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean isBotToken(String name) {
-        return name.equalsIgnoreCase("bot") || name.equalsIgnoreCase("computer");
-    }
-
-    static int[] facesAt(int[] roll, int[] indexes) {
+    public static int[] facesAt(int[] roll, int[] indexes) {
         int[] faces = new int[indexes.length];
         for (int i = 0; i < indexes.length; i++) {
             faces[i] = roll[indexes[i]];
@@ -451,7 +444,7 @@ final class LineView implements View {
         return indexes;
     }
 
-    static String diceWord(int count) {
+    public static String diceWord(int count) {
         return count == 1 ? "1 die" : count + " dice";
     }
 

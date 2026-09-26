@@ -1,8 +1,12 @@
-package greed;
+package greed.view;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+
+import greed.rules.Bot;
+import greed.rules.Player;
+import greed.rules.Scorer;
 
 /** Pure frame renderer. Every line's visible width is the column count. */
 final class Frame {
@@ -1445,12 +1449,6 @@ final class Frame {
     private static String plain(String text, int width, Snapshot snap, String sgr) {
         Paint.Row row = row(width, snap);
         row.add(text == null ? "" : text, sgr);
-        return row.finish();
-    }
-
-    private static String hintPlain(Snapshot snap, String text, int width) {
-        Paint.Row row = row(width, snap);
-        row.add(text, Paint.DIM);
         return row.finish();
     }
 

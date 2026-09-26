@@ -1,7 +1,9 @@
-package greed;
+package greed.rules;
 
 import java.util.List;
 import java.util.Random;
+
+import greed.view.LineView;
 
 /**
  * A computer player. Holds every scoring die. Each computer is assigned one
@@ -11,7 +13,7 @@ import java.util.Random;
  * middle thresholds. Bold takes a pot above zero with two dice, or a pot at
  * the opening score with one die, and keeps rolling longer.
  */
-final class Bot {
+public final class Bot {
     static final String NAME = "Rook";
 
     /**
@@ -19,7 +21,7 @@ final class Bot {
      * Thresholds are dice counts and point totals. A dice threshold of
      * {@link Integer#MAX_VALUE} turns that clause off.
      */
-    enum Personality {
+    public enum Personality {
         CAUTIOUS(4, Integer.MAX_VALUE, Integer.MAX_VALUE, 0, 100, 200, 400, 6, 1),
         STEADY(3, 1, Integer.MAX_VALUE, 0, 300, 600, 1_000, 4, 2),
         BOLD(Integer.MAX_VALUE, 1, 2, 200, 800, 1_500, 2_500, 2, 4);
@@ -87,7 +89,7 @@ final class Bot {
         }
     }
 
-    record Choice(boolean yes, String reason) {}
+    public record Choice(boolean yes, String reason) {}
 
     /**
      * When set, every computer seated by {@link #assign()} gets this personality
@@ -96,11 +98,11 @@ final class Bot {
     static Personality forced;
 
     /** The game's random, set before players sit. Seeded tests stay repeatable. */
-    static Random source = new Random(0);
+    public static Random source = new Random(0);
 
     private Bot() {}
 
-    static Personality assign() {
+    public static Personality assign() {
         if (forced != null) {
             return forced;
         }
@@ -115,7 +117,7 @@ final class Bot {
         return indexes;
     }
 
-    static Choice bank(int hand, int diceLeft, boolean onBoard, int score, int opening, int winning,
+    public static Choice bank(int hand, int diceLeft, boolean onBoard, int score, int opening, int winning,
                        Personality personality) {
         Personality style = personality == null ? Personality.STEADY : personality;
         boolean legal = onBoard || hand >= opening;
@@ -127,50 +129,37 @@ final class Bot {
         }
         if (!onBoard) {
             if (diceLeft >= style.openingPressAt && hand < opening * style.openingMultiple) {
-                return new Choice(false, "rolls. " + diceWord(diceLeft) + " can grow this opening hand.");
+                return new Choice(false, "rolls. " + LineView.diceWord(diceLeft) + " can grow this opening hand.");
             }
             return new Choice(true, "banks to get on the board.");
         }
         if (hand >= style.bankAt(diceLeft)) {
-            return new Choice(true, "banks. " + diceWord(diceLeft) + " left is a poor place to risk "
+            return new Choice(true, "banks. " + LineView.diceWord(diceLeft) + " left is a poor place to risk "
                     + Scorer.format(hand) + ".");
         }
         return new Choice(false, "rolls. " + Scorer.format(hand) + " is worth chasing with "
-                + diceWord(diceLeft) + " left.");
+                + LineView.diceWord(diceLeft) + " left.");
     }
 
-    static Choice cont(Personality personality, int diceLeft, int carried, int opening) {
+    public static Choice cont(Personality personality, int diceLeft, int carried, int opening) {
         Personality style = personality == null ? Personality.STEADY : personality;
         if (style.takes(diceLeft, carried, opening)) {
-            return new Choice(true, "takes the " + diceWord(diceLeft) + " left over, starting at "
+            return new Choice(true, "takes the " + LineView.diceWord(diceLeft) + " left over, starting at "
                     + Scorer.format(carried) + ".");
         }
-        return new Choice(false, "starts fresh. " + diceWord(diceLeft)
+        return new Choice(false, "starts fresh. " + LineView.diceWord(diceLeft)
                 + " left over is a thin way to risk " + Scorer.format(carried) + ".");
     }
 
     /** First free "Rook", then "Rook 2", and so on. */
-    static String nameFor(List<Player> seated) {
-        if (!taken(seated, NAME)) {
+    public static String nameFor(List<Player> seated) {
+        if (!Player.taken(seated, NAME)) {
             return NAME;
         }
         int number = 2;
-        while (taken(seated, NAME + " " + number)) {
+        while (Player.taken(seated, NAME + " " + number)) {
             number++;
         }
         return NAME + " " + number;
-    }
-
-    private static boolean taken(List<Player> seated, String name) {
-        for (Player player : seated) {
-            if (player.name.equalsIgnoreCase(name)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static String diceWord(int count) {
-        return count == 1 ? "1 die" : count + " dice";
     }
 }

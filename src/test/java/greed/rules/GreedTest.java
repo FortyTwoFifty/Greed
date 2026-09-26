@@ -1,4 +1,4 @@
-package greed;
+package greed.rules;
 
 import java.io.StringReader;
 import java.io.StringWriter;
@@ -8,7 +8,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
-/** Scoring checks and scripted games. Run with: java -cp out greed.GreedTest */
+/** Scoring checks and scripted games. Run with: java -cp out greed.rules.GreedTest */
 public final class GreedTest {
     private static int failed;
     private static final String ROOK = "Rook (Steady)";

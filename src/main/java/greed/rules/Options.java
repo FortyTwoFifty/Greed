@@ -1,10 +1,10 @@
-package greed;
+package greed.rules;
 
 /** Command-line flags. {@code --no-color} and {@code NO_COLOR} also turn animation off. */
-final class Options {
-    final boolean plain;
-    final boolean color;
-    final boolean animate;
+public final class Options {
+    public final boolean plain;
+    public final boolean color;
+    public final boolean animate;
 
     private Options(boolean plain, boolean color, boolean animate) {
         this.plain = plain;
@@ -16,7 +16,7 @@ final class Options {
         return parse(args, System.getenv("NO_COLOR") != null);
     }
 
-    static Options parse(String[] args, boolean noColorEnv) {
+    public static Options parse(String[] args, boolean noColorEnv) {
         boolean plain = false;
         boolean color = true;
         boolean animate = true;

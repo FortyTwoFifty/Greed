@@ -1,4 +1,4 @@
-package greed;
+package greed.rules;
 
 import java.util.Random;
 

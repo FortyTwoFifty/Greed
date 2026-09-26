@@ -1,4 +1,4 @@
-package greed;
+package greed.view;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -8,7 +8,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
-/** Frame shape, hold checks, and key mapping. Run with: java -cp out greed.TuiTest */
+import greed.rules.Options;
+import greed.rules.Player;
+
+/** Frame shape, hold checks, and key mapping. Run with: java -cp out greed.view.TuiTest */
 public final class TuiTest {
     private static int failed;
     private static final Pattern COLOR = Pattern.compile("\u001b\\[[0-9;]*m");
@@ -572,11 +575,16 @@ public final class TuiTest {
     private static void imports() throws Exception {
         Path dir = Path.of("src/main/java/greed");
         check(Files.isDirectory(dir), "sources are at src/main/java/greed");
-        try (var files = Files.list(dir)) {
-            for (Path file : files.toList()) {
+        try (var files = Files.walk(dir)) {
+            for (Path file : files.filter(path -> path.toString().endsWith(".java")).toList()) {
                 for (String line : Files.readAllLines(file)) {
                     String trimmed = line.trim();
-                    if (trimmed.startsWith("import ") && !trimmed.startsWith("import java.")) {
+                    if (!trimmed.startsWith("import ")) {
+                        continue;
+                    }
+                    boolean jdk = trimmed.startsWith("import java.");
+                    boolean local = trimmed.startsWith("import greed.");
+                    if (!jdk && !local) {
                         check(false, file.getFileName() + " " + trimmed);
                     }
                 }

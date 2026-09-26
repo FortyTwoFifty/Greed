@@ -68,6 +68,7 @@ Run with `--plain` to play in a line-by-line transcript mode instead of the full
 ./run.sh              # TUI mode
 ./run.sh --plain      # Line transcript mode
 ./run.sh --no-color   # Disable color
+./test.sh             # Compile and run the three test mains
 ```
 
 ## Configuration
@@ -85,19 +86,16 @@ You can also set custom scores when constructing a Game object programmatically.
 
 ```
 src/main/java/greed/
-  Game.java       -- Core game rules and turn loop
-  Scorer.java     -- Dice scoring logic
-  Bot.java        -- Computer player AI
-  Snapshot.java   -- Game state (phase enum, player data)
-  View.java       -- Abstraction layer for I/O
-  TuiView.java    -- Full-screen table renderer
-  Frame.java      -- Box-drawing, dice art, status lines
-  Terminal.java   -- Raw terminal I/O
-  Options.java    -- CLI flags
-  LineView.java   -- Line transcript I/O
-  Player.java     -- Player record
-  Main.java       -- Entry point
+  Main.java                          # package greed
+  rules/
+    Game.java  Options.java  Scorer.java  DieSource.java  RandomDice.java
+    Player.java  Bot.java  View.java  Quit.java
+  view/
+    LineView.java  TuiView.java  Frame.java  Paint.java  Snapshot.java  Terminal.java
 src/test/java/greed/
-  GreedTest.java  -- Rules tests
-  TuiTest.java    -- Screen rendering tests
+  rules/GreedTest.java               # package greed.rules
+  view/TuiTest.java                  # package greed.view
+  view/HotDiceTest.java              # package greed.view
+run.sh                               # play
+test.sh                              # compile everything, run the 3 mains
 ```

@@ -1,4 +1,4 @@
-package greed;
+package greed.rules;
 
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -7,6 +7,10 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+
+import greed.view.LineView;
+import greed.view.Terminal;
+import greed.view.TuiView;
 
 /**
  * Console game of Greed for two or more players.

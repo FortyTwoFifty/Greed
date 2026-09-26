@@ -1,4 +1,4 @@
-package greed;
+package greed.view;
 
 /** ANSI SGR helpers. Color is only the 16-color palette; bold, dim, and reverse survive {@code --no-color}. */
 final class Paint {

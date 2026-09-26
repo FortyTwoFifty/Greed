@@ -1,12 +1,20 @@
-package greed;
+package greed.view;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+import greed.rules.Bot;
+import greed.rules.Game;
+import greed.rules.Options;
+import greed.rules.Player;
+import greed.rules.Quit;
+import greed.rules.Scorer;
+import greed.rules.View;
+
 /** Full-screen table. One key does one thing. The frame is built, then written once. */
-final class TuiView implements View {
+public final class TuiView implements View {
     private final Terminal terminal;
     private final Options options;
     private final Snapshot snap = new Snapshot();
@@ -16,7 +24,7 @@ final class TuiView implements View {
     private int cols = 80;
     private int rows = 24;
 
-    TuiView(Terminal terminal, Options options, int winning, int opening) {
+    public TuiView(Terminal terminal, Options options, int winning, int opening) {
         this.terminal = terminal;
         this.options = options;
         this.keys = null;
@@ -550,7 +558,7 @@ final class TuiView implements View {
         String typed = snap.nameBuf.toString().trim();
         if (typed.length() > 24) {
             snap.fieldError = "Use 24 characters or fewer.";
-        } else if (!typed.isEmpty() && !Snapshot.isBotToken(typed) && Snapshot.taken(snap.players, typed)) {
+        } else if (!typed.isEmpty() && !Snapshot.isBotToken(typed) && Player.taken(snap.players, typed)) {
             snap.fieldError = typed + " is already in the game.";
         } else {
             snap.fieldError = "";
@@ -576,7 +584,7 @@ final class TuiView implements View {
             snap.fieldError = "Use 24 characters or fewer.";
             return "reject-name";
         }
-        if (Snapshot.taken(snap.players, name)) {
+        if (Player.taken(snap.players, name)) {
             snap.fieldError = name + " is already in the game.";
             return "reject-name";
         }

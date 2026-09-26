@@ -1,4 +1,4 @@
-package greed;
+package greed.view;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets;
  * so a resize is noticed while the game is waiting for a key. ISIG stays on, so
  * Ctrl-C is still SIGINT.
  */
-final class Terminal {
+public final class Terminal {
     private static final String ALT_ON = "\u001b[?1049h";
     private static final String ALT_OFF = "\u001b[?1049l";
     private static final String CURSOR_HIDE = "\u001b[?25l";
@@ -31,7 +31,7 @@ final class Terminal {
     private int rows;
     private int cols;
 
-    Terminal() {
+    public Terminal() {
         Charset detected = StandardCharsets.UTF_8;
         if (System.console() != null) {
             detected = System.console().charset();
@@ -48,7 +48,7 @@ final class Terminal {
         return locale.toLowerCase(java.util.Locale.ROOT).contains("utf");
     }
 
-    void enter() {
+    public void enter() {
         saved = run(true, "-g").trim();
         if (saved.isEmpty() || saved.indexOf(' ') >= 0 && saved.startsWith("stty")) {
             throw new IllegalStateException("could not read terminal settings");
@@ -69,7 +69,7 @@ final class Terminal {
         readSize();
     }
 
-    void installHooks() {
+    public void installHooks() {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             restore();
             if (!saidGoodbye && !crashed) {
@@ -86,7 +86,7 @@ final class Terminal {
     }
 
     /** Idempotent. Leaves the main screen, shows the cursor, and restores echo. */
-    synchronized void restore() {
+    public synchronized void restore() {
         if (saved == null && !raw) {
             return;
         }

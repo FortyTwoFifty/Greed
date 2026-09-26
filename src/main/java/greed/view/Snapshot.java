@@ -1,8 +1,11 @@
-package greed;
+package greed.view;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import greed.rules.Game;
+import greed.rules.Player;
 
 /** Everything one frame needs. Input state lives here, so a resize does not clear it. */
 final class Snapshot {
@@ -156,15 +159,6 @@ final class Snapshot {
 
     static boolean isBotToken(String name) {
         return name.equalsIgnoreCase("bot") || name.equalsIgnoreCase("computer");
-    }
-
-    static boolean taken(List<Player> seated, String name) {
-        for (Player player : seated) {
-            if (player.name.equalsIgnoreCase(name)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /** Selection after a scripted edit, for tests that clone the bits. */

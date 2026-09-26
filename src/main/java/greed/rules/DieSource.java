@@ -1,4 +1,4 @@
-package greed;
+package greed.rules;
 
 /** Supplies the next roll. Production uses fair dice; tests use a script. */
 public interface DieSource {

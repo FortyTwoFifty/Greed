@@ -1,4 +1,4 @@
-package greed;
+package greed.view;
 
 import java.io.StringReader;
 import java.io.StringWriter;
@@ -7,10 +7,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import greed.rules.DieSource;
+import greed.rules.Game;
+import greed.rules.Player;
+import greed.rules.Scorer;
+import greed.rules.View;
+
 /**
  * Hot dice must keep every earlier roll in the hand. A bank of only the re-roll fails.
  * ONE_AND_FIVE keeps a dead 6 so the roll is not the straight 1-2-3-4-5.
- * Run with: java -cp out greed.HotDiceTest
+ * Run with: java -cp out greed.view.HotDiceTest
  */
 public final class HotDiceTest {
     private static int failed;

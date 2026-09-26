@@ -1,4 +1,4 @@
-package greed;
+package greed.rules;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -166,7 +166,7 @@ public final class Scorer {
     }
 
     /** 1-2-3-4-5, one each, and no 6. */
-    static boolean isStraight(int[] counts) {
+    public static boolean isStraight(int[] counts) {
         for (int face = 1; face <= 5; face++) {
             if (counts[face] != 1) {
                 return false;
@@ -176,7 +176,7 @@ public final class Scorer {
     }
 
     /** One face has three dice, a different face has two, and nothing else is showing. */
-    static boolean isFullHouse(int[] counts) {
+    public static boolean isFullHouse(int[] counts) {
         int threes = 0;
         int pairs = 0;
         for (int face = 1; face <= 6; face++) {
