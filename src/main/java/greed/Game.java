@@ -153,6 +153,10 @@ public final class Game {
         while (true) {
             int[] roll = dice.roll(diceCount);
             view.showRoll(player, hand, roll, kept);
+            if (diceCount == 2 && isNonScoringDouble(roll) && !player.computer) {
+                view.doubleReRoll(player);
+                continue;
+            }
             if (!Scorer.canScore(roll)) {
                 return Turn.bust(hand);
             }
@@ -181,6 +185,15 @@ public final class Game {
             }
             diceCount = left;
         }
+    }
+
+    /** A double of two dice that doesn't normally score (2, 3, 4, or 6). */
+    private static boolean isNonScoringDouble(int[] roll) {
+        if (roll.length != 2 || roll[0] != roll[1]) {
+            return false;
+        }
+        int face = roll[0];
+        return face == 2 || face == 3 || face == 4 || face == 6;
     }
 
     private static int[] concat(int[] left, int[] right) {
