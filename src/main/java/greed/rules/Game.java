@@ -72,7 +72,7 @@ public final class Game {
         Random random = new Random();
         DieSource dice = new RandomDice(random);
         if (options.plain || System.console() == null) {
-            new Game(new InputStreamReader(System.in), new OutputStreamWriter(System.out), dice, random).play();
+            playPlain(options, dice, random);
             return;
         }
         Terminal terminal = new Terminal();
@@ -80,19 +80,26 @@ public final class Game {
             terminal.enter();
         } catch (RuntimeException failed) {
             terminal.restore();
-            new Game(new InputStreamReader(System.in), new OutputStreamWriter(System.out), dice, random).play();
+            playPlain(options, dice, random);
             return;
         }
         terminal.installHooks();
         try {
             boolean again = true;
             while (again) {
-                TuiView view = new TuiView(terminal, options, WINNING_SCORE, OPENING_SCORE);
-                again = new Game(view, dice, WINNING_SCORE, OPENING_SCORE, random).play();
+                TuiView view = new TuiView(terminal, options, options.winning, options.opening);
+                again = new Game(view, dice, options.winning, options.opening, random).play();
             }
         } finally {
             terminal.restore();
         }
+    }
+
+    /** Line transcript, including the fallback when the terminal cannot be taken over. */
+    private static void playPlain(Options options, DieSource dice, Random random) {
+        LineView view = new LineView(new InputStreamReader(System.in), new OutputStreamWriter(System.out),
+                options.winning, options.opening, options.dev);
+        new Game(view, dice, options.winning, options.opening, random).play();
     }
 
     /** @return true when the player asks for another game */
@@ -108,24 +115,34 @@ public final class Game {
         }
     }
 
-    private List<Player> readPlayers() {
+    List<Player> readPlayers() {
         Bot.source = random;
         int count = view.readPlayerCount();
         if (count == 1) {
             view.soloAgainstComputer();
         }
+        int bots = count == 1 ? 0 : view.readBotCount(count);
         List<Player> players = new ArrayList<>();
-        for (int i = 1; i <= count; i++) {
+        int named = count - bots;
+        for (int i = 1; i <= named; i++) {
             players.add(view.readSeat(i, players, count == 1));
         }
+        for (int i = 0; i < bots; i++) {
+            seatBot(players);
+        }
         if (count == 1) {
-            Player rook = new Player(Bot.nameFor(players), true);
-            rook.personality = Bot.assign();
-            players.add(rook);
-            view.seatComputer(rook);
+            seatBot(players);
         }
         view.goesFirst(players.get(0));
         return players;
+    }
+
+    /** Rook, then Rook 2, and so on. Personality is assigned even when the label hides it. */
+    private void seatBot(List<Player> players) {
+        Player rook = new Player(Bot.nameFor(players), true);
+        rook.personality = Bot.assign();
+        players.add(rook);
+        view.seatComputer(rook);
     }
 
     private boolean run(List<Player> players) {

@@ -12,6 +12,13 @@ public interface View {
     /** Line transcript prompts until 1..10. The screen reads one key; 0 means 10. */
     int readPlayerCount();
 
+    /**
+     * How many of {@code seats} are computers.
+     * Called only when there is more than one seat.
+     * @return a count from 0 through {@code seats - 1}
+     */
+    int readBotCount(int seats);
+
     /** The line "One human sits with the computer. Rook takes the other seat." */
     void soloAgainstComputer();
 

@@ -8,10 +8,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
+import greed.view.LineView;
+
 /** Scoring checks and scripted games. Run with: java -cp out greed.rules.GreedTest */
 public final class GreedTest {
     private static int failed;
-    private static final String ROOK = "Rook (Steady)";
+    private static final String ROOK = "Rook";
 
     public static void main(String[] args) {
         scoring();
@@ -36,6 +38,15 @@ public final class GreedTest {
         carriedPotPassesTwiceThenHotDice();
         bustLosesTheCarriedPot();
         personalitiesComeFromTheSeed();
+        bankCutoffsScaleWithTheWinningScore();
+        personalityStaysHiddenUnlessDev();
+        countedBotsSitAfterTheHumans();
+        tokenAddsAComputerBesideTheCount();
+        soloRejectsTheBotToken();
+        badBotCountAsksAgain();
+        botsUseTheConfiguredOpening();
+        cautiousBotKeepsItsPersonality();
+        customOpeningAndWinning();
         if (failed > 0) {
             System.out.println(failed + " failed");
             System.exit(1);
@@ -98,7 +109,7 @@ public final class GreedTest {
     }
 
     private static void banksOpeningHandAndWins() {
-        Run run = play(2_000, 750, lines("2", "Alice", "Bob", "1 2 3 4", "b"),
+        Run run = play(2_000, 750, lines("2", "0", "Alice", "Bob", "1 2 3 4", "b"),
                 new int[] {1, 1, 1, 1, 2},
                 new int[] {2, 3, 4, 4, 5});
         run.dice.assertDrained();
@@ -109,7 +120,7 @@ public final class GreedTest {
     }
 
     private static void rejectsBankBelowOpeningThenWins() {
-        Run run = play(1_050, 750, lines("2", "Alice", "Bob", "all", "b", "", "all", "b"),
+        Run run = play(1_050, 750, lines("2", "0", "Alice", "Bob", "all", "b", "", "all", "b"),
                 new int[] {5, 2, 3, 4, 6},
                 new int[] {1, 1, 1, 2},
                 new int[] {2, 3, 4, 4, 6});
@@ -121,7 +132,7 @@ public final class GreedTest {
     }
 
     private static void hotDiceThenBustLosesTheHand() {
-        Run run = play(1_000, 750, lines("2", "Alice", "Bob", "all", "", "all", "b"),
+        Run run = play(1_000, 750, lines("2", "0", "Alice", "Bob", "all", "", "all", "b"),
                 new int[] {1, 1, 1, 5, 5},
                 new int[] {2, 3, 4, 6, 6},
                 new int[] {1, 1, 1, 1, 2},
@@ -137,7 +148,7 @@ public final class GreedTest {
     }
 
     private static void continuationBanksOnlyTheNewHand() {
-        Run run = play(5_000, 100, lines("2", "Alice", "Bob", "all", "b", "c", "all", "b", "quit"),
+        Run run = play(5_000, 100, lines("2", "0", "Alice", "Bob", "all", "b", "c", "all", "b", "quit"),
                 new int[] {1, 1, 1, 2, 3},
                 new int[] {1, 4});
         run.dice.assertDrained();
@@ -149,7 +160,7 @@ public final class GreedTest {
     }
 
     private static void newHandRollsFiveDice() {
-        Run run = play(5_000, 100, lines("2", "Alice", "Bob", "all", "b", "n", "all", "b", "quit"),
+        Run run = play(5_000, 100, lines("2", "0", "Alice", "Bob", "all", "b", "n", "all", "b", "quit"),
                 new int[] {1, 1, 1, 2, 3},
                 new int[] {1, 1, 1, 1, 2});
         run.dice.assertDrained();
@@ -158,7 +169,7 @@ public final class GreedTest {
     }
 
     private static void rejectsDieThatDoesNotScore() {
-        Run run = play(5_000, 100, lines("2", "Ann", "Ben", "2", "1", "b", "quit"),
+        Run run = play(5_000, 100, lines("2", "0", "Ann", "Ben", "2", "1", "b", "quit"),
                 new int[] {1, 2, 3, 4, 6});
         run.dice.assertDrained();
         expect(run.output, "2 does not score on its own.");
@@ -243,7 +254,7 @@ public final class GreedTest {
     }
 
     private static void botPressesUntilItCanOpen() {
-        Run run = playAs(Bot.Personality.STEADY, 5_000, 750, lines("2", "bot", "Bea", "quit"),
+        Run run = playAs(Bot.Personality.STEADY, 5_000, 750, lines("2", "0", "bot", "Bea", "quit"),
                 new int[] {5, 2, 3, 4, 6},
                 new int[] {1, 1, 1, 2});
         run.dice.assertDrained();
@@ -256,7 +267,7 @@ public final class GreedTest {
     }
 
     private static void botTakesFourDiceAndRefusesAShortLeftover() {
-        Run taken = playAs(Bot.Personality.STEADY, 5_000, 100, lines("2", "Alice", "bot", "1", "b", "quit"),
+        Run taken = playAs(Bot.Personality.STEADY, 5_000, 100, lines("2", "0", "Alice", "bot", "1", "b", "quit"),
                 new int[] {1, 2, 3, 4, 6},
                 new int[] {1, 1, 1, 2});
         taken.dice.assertDrained();
@@ -265,7 +276,7 @@ public final class GreedTest {
         expect(taken.output, ROOK + " rolls the 4 dice left unscored.");
         expect(taken.output, ROOK + " banks 1,100 points.");
 
-        Run busted = playAs(Bot.Personality.STEADY, 5_000, 750, lines("2", "Alice", "bot", "all", "b", "quit"),
+        Run busted = playAs(Bot.Personality.STEADY, 5_000, 750, lines("2", "0", "Alice", "bot", "all", "b", "quit"),
                 new int[] {1, 1, 1, 1, 2},
                 new int[] {2},
                 new int[] {1, 2, 3, 4, 6});
@@ -276,7 +287,7 @@ public final class GreedTest {
     }
 
     private static void botHotDiceBustsTheWholeHand() {
-        Run run = playAs(Bot.Personality.STEADY, 5_000, 750, lines("2", "bot", "Bea", "quit"),
+        Run run = playAs(Bot.Personality.STEADY, 5_000, 750, lines("2", "0", "bot", "Bea", "quit"),
                 new int[] {1, 1, 1, 5, 5},
                 new int[] {2, 3, 4, 6, 6},
                 new int[] {1, 2, 3, 4, 6});
@@ -287,7 +298,7 @@ public final class GreedTest {
     }
 
     private static void straightIsHotDice() {
-        Run run = play(10_000, 100, lines("2", "Ada", "Bob", "all", "", "all", "b", "quit"),
+        Run run = play(10_000, 100, lines("2", "0", "Ada", "Bob", "all", "", "all", "b", "quit"),
                 new int[] {1, 2, 3, 4, 5},
                 new int[] {1, 2, 3, 4, 6});
         run.dice.assertDrained();
@@ -297,7 +308,7 @@ public final class GreedTest {
     }
 
     private static void fullHouseIsHotDice() {
-        Run run = play(10_000, 100, lines("2", "Ada", "Bob", "all", "", "all", "b", "quit"),
+        Run run = play(10_000, 100, lines("2", "0", "Ada", "Bob", "all", "", "all", "b", "quit"),
                 new int[] {3, 3, 3, 2, 2},
                 new int[] {5, 2, 3, 4, 6});
         run.dice.assertDrained();
@@ -306,7 +317,7 @@ public final class GreedTest {
     }
 
     private static void fourRunIsNotHeld() {
-        Run run = play(10_000, 100, lines("2", "Ada", "Bob", "1 2 3 4 5", "1", "b", "quit"),
+        Run run = play(10_000, 100, lines("2", "0", "Ada", "Bob", "1 2 3 4 5", "1", "b", "quit"),
                 new int[] {1, 2, 3, 4, 6});
         run.dice.assertDrained();
         expect(run.output, "2, 3, 4 and 6 do not score on their own.");
@@ -314,7 +325,7 @@ public final class GreedTest {
     }
 
     private static void straightDoesNotAssembleAcrossRolls() {
-        Run run = play(10_000, 100, lines("2", "Ada", "Bob", "all", "r", "all", "b", "quit"),
+        Run run = play(10_000, 100, lines("2", "0", "Ada", "Bob", "all", "r", "all", "b", "quit"),
                 new int[] {1, 2, 3, 4, 6},
                 new int[] {5, 2, 3, 6});
         run.dice.assertDrained();
@@ -323,7 +334,7 @@ public final class GreedTest {
     }
 
     private static void fullHouseDoesNotAssembleAcrossRolls() {
-        Run run = play(10_000, 100, lines("2", "Ada", "Bob", "all", "r", "all", "b", "quit"),
+        Run run = play(10_000, 100, lines("2", "0", "Ada", "Bob", "all", "r", "all", "b", "quit"),
                 new int[] {3, 3, 3, 2, 6},
                 new int[] {5, 2});
         run.dice.assertDrained();
@@ -333,7 +344,7 @@ public final class GreedTest {
     }
 
     private static void botHoldsFullHouse() {
-        Run run = playAs(Bot.Personality.STEADY, 5_000, 750, lines("2", "bot", "Bea", "quit"),
+        Run run = playAs(Bot.Personality.STEADY, 5_000, 750, lines("2", "0", "bot", "Bea", "quit"),
                 new int[] {3, 3, 3, 2, 2},
                 new int[] {2, 3, 4, 6, 6},
                 new int[] {1, 2, 3, 4, 6});
@@ -343,7 +354,7 @@ public final class GreedTest {
     }
 
     private static void carriedPotPassesTwiceThenHotDice() {
-        Run run = play(20_000, 750, lines("3", "Alice", "Bob", "Cara",
+        Run run = play(20_000, 750, lines("3", "0", "Alice", "Bob", "Cara",
                 "all", "b", "c", "all", "b", "c", "all", "", "all", "b"),
                 new int[] {1, 1, 1, 2, 3},
                 new int[] {1, 4},
@@ -359,7 +370,7 @@ public final class GreedTest {
     }
 
     private static void bustLosesTheCarriedPot() {
-        Run run = play(20_000, 750, lines("2", "Alice", "Bob", "all", "b", "c", "quit"),
+        Run run = play(20_000, 750, lines("2", "0", "Alice", "Bob", "all", "b", "c", "quit"),
                 new int[] {1, 1, 1, 2, 3},
                 new int[] {2, 3},
                 new int[] {1, 2, 3, 4, 6});
@@ -377,7 +388,7 @@ public final class GreedTest {
      * and the next roll is what busts, so the script is empty afterwards.
      */
     private static void computerRerollsANonScoringDouble() {
-        Run run = playAs(Bot.Personality.STEADY, 5_000, 750, lines("2", "bot", "Bea", "quit"),
+        Run run = playAs(Bot.Personality.STEADY, 5_000, 750, lines("2", "0", "bot", "Bea", "quit"),
                 new int[] {2, 2, 2, 3, 4},
                 new int[] {6, 6},
                 new int[] {2, 3},
@@ -394,16 +405,218 @@ public final class GreedTest {
         Random probe = new Random(99);
         Bot.Personality first = Bot.Personality.pick(probe);
         Bot.Personality second = Bot.Personality.pick(probe);
-        Run run = play(500, 100, lines("2", "bot", "bot"), new Random(99),
-                new int[] {1, 1, 1, 1, 2},
-                new int[] {2, 3, 4, 6, 6});
-        run.dice.assertDrained();
-        expect(run.output, "Rook (" + first.adjective() + ") sits down for the computer.");
-        expect(run.output, "Rook 2 (" + second.adjective() + ") sits down for the computer.");
+        int[][] rolls = {new int[] {1, 1, 1, 1, 2}, new int[] {2, 3, 4, 6, 6}};
+        Run hidden = play(500, 100, lines("2", "0", "bot", "bot"), new Random(99), rolls);
+        hidden.dice.assertDrained();
+        expect(hidden.output, "Rook sits down for the computer.");
+        expect(hidden.output, "Rook 2 sits down for the computer.");
+        check(!hidden.output.contains("Rook (") && !hidden.output.contains("Rook 2 ("),
+                "a normal game hides both personalities");
+        expect(hidden.output, "wins with");
+        check(!hidden.output.contains("Hold dice by number"),
+                "an all-bot game never asks a human to hold");
+
+        StringWriter shown = new StringWriter();
+        LineView view = new LineView(new StringReader(lines("2", "0", "bot", "bot")), shown, 500, 100, true);
+        ScriptedDice dice = new ScriptedDice(rolls);
+        new Game(view, dice, 500, 100, new Random(99)).play();
+        dice.assertDrained();
+        expect(shown.toString(), "Rook (" + first.adjective() + ") sits down for the computer.");
+        expect(shown.toString(), "Rook 2 (" + second.adjective() + ") sits down for the computer.");
         Random again = new Random(99);
         check(Bot.Personality.pick(again) == first, "same seed draws the same first personality");
         check(Bot.Personality.pick(again) == second, "same seed draws the same second personality");
     }
+
+    /** At 10,000 the cutoffs are the table. At 2,000 they scale and round to the nearest 50. */
+    private static void bankCutoffsScaleWithTheWinningScore() {
+        Bot.Personality[] styles = {
+            Bot.Personality.CAUTIOUS, Bot.Personality.STEADY, Bot.Personality.BOLD
+        };
+        int[][] at10000 = {
+            {0, 100, 200, 400},
+            {0, 300, 600, 1_000},
+            {200, 800, 1_500, 2_500}
+        };
+        int[][] at2000 = {
+            {0, 50, 50, 100},
+            {0, 50, 100, 200},
+            {50, 150, 300, 500}
+        };
+        for (int s = 0; s < styles.length; s++) {
+            for (int dice = 1; dice <= 4; dice++) {
+                int full = styles[s].bankAt(dice, 10_000);
+                int shortGame = styles[s].bankAt(dice, 2_000);
+                check(full == at10000[s][dice - 1],
+                        styles[s] + " with " + dice + " at 10,000 is " + at10000[s][dice - 1]
+                                + " (was " + full + ")");
+                check(shortGame == at2000[s][dice - 1],
+                        styles[s] + " with " + dice + " at 2,000 is " + at2000[s][dice - 1]
+                                + " (was " + shortGame + ")");
+            }
+            check(styles[s].bankAt(5, 10_000) == at10000[s][3], styles[s] + " uses bank-at-4 for 5 dice");
+            check(styles[s].bankAt(5, 2_000) == at2000[s][3], styles[s] + " scales 5 dice like 4");
+        }
+        Bot.Personality steady = Bot.Personality.STEADY;
+        check(Bot.bank(500, 4, true, 1_000, 750, 10_000, steady).reason().startsWith("rolls."),
+                "steady rolls a 500 hand with 4 dice at 10,000");
+        check(Bot.bank(500, 4, true, 1_000, 750, 2_000, steady).reason().startsWith("banks."),
+                "steady banks that same 500 hand at 2,000");
+    }
+
+    private static void personalityStaysHiddenUnlessDev() {
+        Bot.forced = Bot.Personality.STEADY;
+        try {
+            Seating hidden = seat(false, "2", "1", "Ada");
+            expect(hidden.output, "Rook sits down for the computer.");
+            check(!hidden.output.contains("Cautious") && !hidden.output.contains("Steady")
+                            && !hidden.output.contains("Bold") && !hidden.output.contains("(Steady)"),
+                    "dev off hides the adjective");
+            Player rook = computerNamed(hidden.players, "Rook");
+            check(rook != null && rook.personality == Bot.Personality.STEADY && !rook.revealPersonality,
+                    "hidden Rook is still Steady");
+
+            Seating shown = seat(true, "2", "1", "Ada");
+            expect(shown.output, "Rook (Steady) sits down for the computer.");
+            Player revealed = computerNamed(shown.players, "Rook");
+            check(revealed != null && revealed.revealPersonality, "dev reveals Rook");
+        } finally {
+            Bot.forced = null;
+        }
+    }
+
+    private static void countedBotsSitAfterTheHumans() {
+        for (Bot.Personality style : List.of(Bot.Personality.STEADY, Bot.Personality.CAUTIOUS)) {
+            Bot.forced = style;
+            try {
+                Seating seating = seat(false, "4", "2", "Ann", "Bea");
+                expect(seating.output, "Rook sits down for the computer.");
+                expect(seating.output, "Rook 2 sits down for the computer.");
+                expect(seating.output, "Ann goes first.");
+                check(seating.players.size() == 4, "four seats");
+                check(!seating.players.get(0).computer && seating.players.get(0).name.equals("Ann"),
+                        "Ann sits first");
+                check(!seating.players.get(1).computer && seating.players.get(1).name.equals("Bea"),
+                        "Bea is the other human");
+                check(computerNamed(seating.players, "Rook") != null
+                                && computerNamed(seating.players, "Rook").personality == style,
+                        "Rook takes the forced personality");
+                check(computerNamed(seating.players, "Rook 2") != null
+                                && computerNamed(seating.players, "Rook 2").personality == style,
+                        "Rook 2 takes the forced personality");
+            } finally {
+                Bot.forced = null;
+            }
+        }
+    }
+
+    /** 3 seats, 1 counted computer, then Ann and the bot token: two computers and one human. */
+    private static void tokenAddsAComputerBesideTheCount() {
+        Bot.forced = null;
+        Seating seating = seat(false, "3", "1", "Ann", "bot");
+        check(seating.players.size() == 3, "three seats filled");
+        check(!seating.players.get(0).computer && seating.players.get(0).name.equals("Ann"), "Ann is the human");
+        Player rook = seating.players.get(1);
+        Player second = seating.players.get(2);
+        check(rook.computer && rook.name.equals("Rook") && rook.personality != null, "token seats Rook");
+        check(second.computer && second.name.equals("Rook 2") && second.personality != null,
+                "the counted computer is Rook 2");
+        expect(seating.output, "Rook sits down for the computer.");
+        expect(seating.output, "Rook 2 sits down for the computer.");
+        expect(seating.output, "Ann goes first.");
+        check(!seating.output.contains("Cautious") && !seating.output.contains("Steady")
+                        && !seating.output.contains("Bold"),
+                "the extra computer stays unlabeled");
+
+        Seating computer = seat(false, "2", "0", "Computer", "Bea");
+        check(computer.players.get(0).computer && computer.players.get(0).name.equals("Rook")
+                        && computer.players.get(0).personality != null,
+                "Computer, any case, seats Rook");
+    }
+
+    private static void soloRejectsTheBotToken() {
+        Run run = play(10_000, 750, lines("1", "bot", "Ada", "quit"), new int[] {1, 2, 3, 4, 6});
+        run.dice.assertDrained();
+        expect(run.output, "Type your name. Rook takes the other seat.");
+        expect(run.output, "One human sits with the computer. Rook takes the other seat.");
+        expect(run.output, "Ada goes first.");
+        check(!run.output.contains("How many computer players?"), "solo does not ask for a bot count");
+    }
+
+    private static void badBotCountAsksAgain() {
+        Seating seating = seat(false, "4", "no", "9", "2", "Ann", "Bea");
+        expect(seating.output, "Enter a number from 0 to 3.");
+        check(seating.players.size() == 4, "a bad count does not change the seat total");
+        Run solo = play(10_000, 750, lines("1", "Ada", "quit"), new int[] {1, 2, 3, 4, 6});
+        solo.dice.assertDrained();
+        check(!solo.output.contains("How many computer players?"), "one seat skips the bot question");
+    }
+
+    /** Steady takes 1 die at 300 when the opening score is 200. At 750 that pot is declined. */
+    private static void botsUseTheConfiguredOpening() {
+        Run run = playAs(Bot.Personality.STEADY, 5_000, 200, lines("2", "1", "Ann", "all", "b", "quit"),
+                new int[] {1, 1, 5, 5, 2},
+                new int[] {2},
+                new int[] {1, 2, 3, 4, 6});
+        run.dice.assertDrained();
+        expect(run.output, "takes the 1 die left over, starting at 300.");
+    }
+
+    /**
+     * Five 2s are 800 and hot, so the next 5 adds 50 and leaves 4 dice.
+     * Cautious banks that opening hand. Steady would press it.
+     */
+    private static void cautiousBotKeepsItsPersonality() {
+        check(Bot.bank(800, 4, false, 0, 750, 10_000, Bot.Personality.CAUTIOUS).reason()
+                        .startsWith("banks to get on the board."),
+                "cautious banks 800 with 4 dice");
+        check(Bot.bank(800, 4, false, 0, 750, 10_000, Bot.Personality.STEADY).reason()
+                        .contains("can grow this opening hand."),
+                "steady would press 800 with 4 dice");
+        Run run = playAs(Bot.Personality.CAUTIOUS, 5_000, 750, lines("2", "1", "Bea", "quit"),
+                new int[] {2, 3, 4, 6, 6},
+                new int[] {2, 2, 2, 2, 2},
+                new int[] {5, 2, 3, 4, 6});
+        run.dice.assertDrained();
+        expect(run.output, "banks to get on the board.");
+        check(!run.output.contains("can grow this opening hand."),
+                "the seated Cautious bot does not press like Steady");
+    }
+
+    private static void customOpeningAndWinning() {
+        Run below = play(5_000, 300, lines("2", "0", "Alice", "Bob", "1", "b", "quit"),
+                new int[] {5, 2, 3, 4, 6});
+        below.dice.assertDrained();
+        expect(below.output, "You need 300 in this hand");
+        expect(below.output, "You cannot bank on this roll.");
+        check(!below.output.contains("You need 750"), "the opening line uses 300");
+
+        Run won = play(400, 100, lines("2", "0", "Alice", "Bob", "1 2 3 4", "b"),
+                new int[] {5, 5, 5, 5, 2},
+                new int[] {2, 3, 4, 4, 5});
+        won.dice.assertDrained();
+        expect(won.output, "Alice banks 1,000 points.");
+        expect(won.output, "Alice gets on the board with 1,000.");
+        expect(won.output, "Alice wins with 1,000 points.");
+    }
+
+    private static Seating seat(boolean dev, String... input) {
+        StringWriter output = new StringWriter();
+        LineView view = new LineView(new StringReader(lines(input)), output, 10_000, 750, dev);
+        Game game = new Game(view, new ScriptedDice(), 10_000, 750);
+        return new Seating(game.readPlayers(), output.toString());
+    }
+
+    private static Player computerNamed(List<Player> players, String name) {
+        for (Player player : players) {
+            if (player.computer && player.name.equals(name)) {
+                return player;
+            }
+        }
+        return null;
+    }
+
+    private record Seating(List<Player> players, String output) {}
 
     private static int scoreOf(int[] roll, int[] indexes) {
         int[] faces = new int[indexes.length];

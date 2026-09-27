@@ -49,7 +49,7 @@ public final class HotDiceTest {
         int[][] rolls = {FIVE_ONES, THREE_FOURS};
         int banked = bankOf(scoringFaces(FIVE_ONES), scoringFaces(THREE_FOURS));
         int hot = points(scoringFaces(FIVE_ONES));
-        String[] line = {"2", "Alice", "Bob", "all", "", "all", "b", "quit"};
+        String[] line = {"2", "0", "Alice", "Bob", "all", "", "all", "b", "quit"};
         playLine("line hot then score then bank", 10_000, 100, rolls, line, "Alice", banked, hot);
         playTui("tui hot then score then bank", 10_000, 100, rolls, "Alice", banked, hot, keys -> {
             seat(keys, "Alice", "Bob");
@@ -66,7 +66,7 @@ public final class HotDiceTest {
         int[][] rolls = {FIVE_ONES, ONE_AND_FIVE};
         int banked = bankOf(scoringFaces(FIVE_ONES), new int[] {1});
         int hot = points(scoringFaces(FIVE_ONES));
-        String[] line = {"2", "Alice", "Bob", "all", "", "1", "b", "quit"};
+        String[] line = {"2", "0", "Alice", "Bob", "all", "", "1", "b", "quit"};
         playLine("line hot then partial then bank", 10_000, 100, rolls, line, "Alice", banked, hot);
         playTui("tui hot then partial then bank", 10_000, 100, rolls, "Alice", banked, hot, keys -> {
             seat(keys, "Alice", "Bob");
@@ -84,8 +84,8 @@ public final class HotDiceTest {
         int[][] rolls = {FIVE_ONES, THREE_FOURS};
         int banked = bankOf(scoringFaces(FIVE_ONES), scoringFaces(THREE_FOURS));
         int hot = points(scoringFaces(FIVE_ONES));
-        String[] all = {"2", "Alice", "Bob", "all", "", "all", "b", "quit"};
-        String[] toggled = {"2", "Alice", "Bob", "1 2 3 4 5", "", "1 2 3", "b", "quit"};
+        String[] all = {"2", "0", "Alice", "Bob", "all", "", "all", "b", "quit"};
+        String[] toggled = {"2", "0", "Alice", "Bob", "1 2 3 4 5", "", "1 2 3", "b", "quit"};
         playLine("line hold-all both rolls", 10_000, 100, rolls, all, "Alice", banked, hot);
         playLine("line toggle each die", 10_000, 100, rolls, toggled, "Alice", banked, hot);
         playTui("tui hold-all both rolls", 10_000, 100, rolls, "Alice", banked, hot, keys -> {
@@ -113,10 +113,11 @@ public final class HotDiceTest {
         int[][] rolls = {FIVE_ONES, THREE_FOURS};
         int banked = bankOf(scoringFaces(FIVE_ONES), scoringFaces(THREE_FOURS));
         int hot = points(scoringFaces(FIVE_ONES));
-        String[] line = {"2", "bot", "Bea", "quit"};
+        String[] line = {"2", "0", "bot", "Bea", "quit"};
         playLine("line bot hot dice", 10_000, 750, rolls, line, "Rook", banked, hot);
         playTui("tui bot hot dice", 10_000, 750, rolls, "Rook", banked, hot, keys -> {
             keys.add((int) '2');
+            keys.add((int) '0');
             type(keys, "bot");
             type(keys, "Bea");
             quit(keys);
@@ -134,7 +135,7 @@ public final class HotDiceTest {
         int[][] rolls = {FIVE_ONES, THREE_FOURS};
         int banked = bankOf(scoringFaces(FIVE_ONES), scoringFaces(THREE_FOURS));
         int hot = points(scoringFaces(FIVE_ONES));
-        String[] line = {"2", "Alice", "Bob", "all", "", "all", "b", "quit"};
+        String[] line = {"2", "0", "Alice", "Bob", "all", "", "all", "b", "quit"};
         playLine("line hot before on the board", 10_000, opening, rolls, line, "Alice", banked, hot);
         playTui("tui hot before on the board", 10_000, opening, rolls, "Alice", banked, hot, keys -> {
             seat(keys, "Alice", "Bob");
@@ -156,7 +157,7 @@ public final class HotDiceTest {
         int alice = points(scoringFaces(ONE_AND_FIVE));
         int hot = alice + points(THREE_ONES);
         int banked = hot + points(scoringFaces(THREE_FOURS));
-        String[] line = {"2", "Alice", "Bob", "all", "b", "c", "all", "", "all", "b", "quit"};
+        String[] line = {"2", "0", "Alice", "Bob", "all", "b", "c", "all", "", "all", "b", "quit"};
         Result lineResult = playLine("line hot after continue", 20_000, 100, rolls, line, "Bob", banked, hot);
         if (lineResult != null) {
             check(score(lineResult, "Alice") == alice, "line hot after continue keeps Alice's bank");
@@ -194,7 +195,7 @@ public final class HotDiceTest {
         ScriptedDice dice = new ScriptedDice(rolls);
         ArrayDeque<Integer> keys = new ArrayDeque<>();
         script.write(keys);
-        TuiView tui = TuiView.scripted(keys, 80, 24, true, true);
+        TuiView tui = TuiView.scripted(keys, 80, 24, true, true, winning, opening);
         Recording recording = new Recording(tui);
         StringWriter sink = new StringWriter();
         if (!run(label, winning, opening, dice, recording, sink)) {
@@ -247,6 +248,7 @@ public final class HotDiceTest {
 
     private static void seat(ArrayDeque<Integer> keys, String first, String second) {
         keys.add((int) '2');
+        keys.add((int) '0');
         type(keys, first);
         type(keys, second);
     }
@@ -351,6 +353,11 @@ public final class HotDiceTest {
         @Override
         public int readPlayerCount() {
             return next.readPlayerCount();
+        }
+
+        @Override
+        public int readBotCount(int seats) {
+            return next.readBotCount(seats);
         }
 
         @Override

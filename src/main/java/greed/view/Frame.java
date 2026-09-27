@@ -47,6 +47,7 @@ final class Frame {
         }
         return switch (snap.phase) {
             case SETUP_COUNT -> setup(snap, cols, rows, false);
+            case SETUP_BOTS -> botCount(snap, cols, rows);
             case SETUP_NAMES -> setup(snap, cols, rows, true);
             case WIN -> winner(snap, cols, rows);
             default -> table(snap, cols, rows);
@@ -211,6 +212,31 @@ final class Frame {
         List<Seg> pairs = new ArrayList<>();
         addPair(pairs, "1-9", "players", true, true);
         addPair(pairs, "0", "ten", true, false);
+        addPair(pairs, "q", "quit", true, false);
+        return spread(snap, width, pairs, List.of(), Math.max(0, width - segWidth(pairs)));
+    }
+
+    /** Computer count. Separate from {@link #setupHint} so the player-count keys stay put. */
+    private static List<String> botCount(Snapshot snap, int cols, int rows) {
+        Glyphs g = Glyphs.of(snap.unicode);
+        int inner = cols - 2;
+        int text = Math.max(1, inner - 2);
+        int max = Math.max(snap.botMax, 0);
+        List<String> body = new ArrayList<>();
+        body.add(centerIn("How many computer players?", text));
+        body.add(centerIn("0 to " + max, text));
+        return present(snap, g, cols, rows, body, inner, null, botHint(snap, text), true, null);
+    }
+
+    private static String botHint(Snapshot snap, int width) {
+        List<Seg> pairs = new ArrayList<>();
+        addPair(pairs, "0", "none", true, true);
+        int max = Math.max(snap.botMax, 0);
+        if (max == 1) {
+            addPair(pairs, "1", "bot", true, false);
+        } else if (max > 1) {
+            addPair(pairs, "1-" + max, "bots", true, false);
+        }
         addPair(pairs, "q", "quit", true, false);
         return spread(snap, width, pairs, List.of(), Math.max(0, width - segWidth(pairs)));
     }
@@ -506,9 +532,12 @@ final class Frame {
         return row.finish();
     }
 
-    /** Personality already marks a computer, so the tag stays only for an unmarked one. */
+    /** A revealed personality is the mark. Hidden computers, and ones with no personality, keep the tag. */
     private static String botTag(Player player) {
-        if (!player.computer || player.personality != null) {
+        if (!player.computer) {
+            return "";
+        }
+        if (player.revealPersonality && player.personality != null) {
             return "";
         }
         return " [bot]";

@@ -19,7 +19,8 @@ public final class Bot {
     /**
      * How a computer takes a passed hand and when it banks.
      * Thresholds are dice counts and point totals. A dice threshold of
-     * {@link Integer#MAX_VALUE} turns that clause off.
+     * {@link Integer#MAX_VALUE} turns that clause off. The bank-at totals
+     * are for a winning score of 10,000 and scale with the winning score.
      */
     public enum Personality {
         CAUTIOUS(4, Integer.MAX_VALUE, Integer.MAX_VALUE, 0, 100, 200, 400, 6, 1),
@@ -65,13 +66,14 @@ public final class Bot {
             return diceLeft >= anyPotAtDice && carried > 0;
         }
 
-        int bankAt(int diceLeft) {
-            return switch (Math.max(diceLeft, 1)) {
+        int bankAt(int diceLeft, int winning) {
+            int cutoff = switch (Math.max(diceLeft, 1)) {
                 case 1 -> bankAt1;
                 case 2 -> bankAt2;
                 case 3 -> bankAt3;
                 default -> bankAt4;
             };
+            return scaleCutoff(cutoff, winning);
         }
 
         /** "Bold", "Steady", "Cautious" — the word shown beside the name. */
@@ -95,12 +97,25 @@ public final class Bot {
      * When set, every computer seated by {@link #assign()} gets this personality
      * instead of a draw. Tests clear it afterwards.
      */
-    static Personality forced;
+    public static Personality forced;
 
     /** The game's random, set before players sit. Seeded tests stay repeatable. */
     public static Random source = new Random(0);
 
     private Bot() {}
+
+    /**
+     * Scales a point cutoff from a 10,000 game to {@code winning}.
+     * Rounded to the nearest 50. Zero stays zero. Any other cutoff stays at least 50.
+     */
+    static int scaleCutoff(int cutoff, int winning) {
+        if (cutoff <= 0) {
+            return 0;
+        }
+        long product = (long) cutoff * winning;
+        int scaled = (int) ((product + 250_000L) / 500_000L * 50L);
+        return Math.max(scaled, 50);
+    }
 
     public static Personality assign() {
         if (forced != null) {
@@ -133,7 +148,7 @@ public final class Bot {
             }
             return new Choice(true, "banks to get on the board.");
         }
-        if (hand >= style.bankAt(diceLeft)) {
+        if (hand >= style.bankAt(diceLeft, winning)) {
             return new Choice(true, "banks. " + LineView.diceWord(diceLeft) + " left is a poor place to risk "
                     + Scorer.format(hand) + ".");
         }

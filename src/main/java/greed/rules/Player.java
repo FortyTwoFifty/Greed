@@ -7,6 +7,8 @@ public final class Player {
     public final boolean computer;
     /** Set once for a computer, when the game starts. Humans stay null. */
     public Bot.Personality personality;
+    /** When set, {@link #label()} adds the personality. Views copy {@code --dev} here. */
+    public boolean revealPersonality;
     public int score;
     public boolean onBoard;
 
@@ -15,9 +17,9 @@ public final class Player {
         this.computer = computer;
     }
 
-    /** The name as it is shown. A computer includes its personality. */
+    /** The name as it is shown. A revealed computer includes its personality. */
     public String label() {
-        if (computer && personality != null) {
+        if (revealPersonality && computer && personality != null) {
             return name + " (" + personality.adjective() + ")";
         }
         return name;

@@ -10,7 +10,7 @@ import greed.rules.Player;
 /** Everything one frame needs. Input state lives here, so a resize does not clear it. */
 final class Snapshot {
     enum Phase {
-        SETUP_COUNT, SETUP_NAMES,
+        SETUP_COUNT, SETUP_BOTS, SETUP_NAMES,
         HOLD, BANK_OR_ROLL, ROLL_ONLY, HOT, CONTINUE, DOUBLE_REROLL,
         BUST, BANK, WIN
     }
@@ -55,6 +55,8 @@ final class Snapshot {
     String resultName = "";
     boolean resultBot;
     int countChoice;
+    /** Largest computer count on the bot screen: seats minus one. */
+    int botMax;
 
     Player winner;
 
@@ -102,6 +104,7 @@ final class Snapshot {
         copy.resultName = resultName;
         copy.resultBot = resultBot;
         copy.countChoice = countChoice;
+        copy.botMax = botMax;
         copy.winner = winner;
         copy.shownScore = shownScore;
         copy.shownScoreIndex = shownScoreIndex;

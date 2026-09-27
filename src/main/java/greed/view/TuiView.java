@@ -38,20 +38,38 @@ public final class TuiView implements View {
         }
     }
 
-    /** Fixed size, scripted keys, no terminal and no sleeps. */
+    /** Fixed size, scripted keys, no terminal and no sleeps. Defaults are 10,000 and 750. */
     static TuiView scripted(ArrayDeque<Integer> keys, int cols, int rows, boolean color, boolean unicode) {
-        TuiView view = new TuiView(keys, cols, rows, color, unicode);
-        return view;
+        return scripted(keys, cols, rows, color, unicode, Game.WINNING_SCORE, Game.OPENING_SCORE);
     }
 
-    private TuiView(ArrayDeque<Integer> keys, int cols, int rows, boolean color, boolean unicode) {
+    /** Same as {@link #scripted(ArrayDeque, int, int, boolean, boolean)} with configured scores. */
+    static TuiView scripted(ArrayDeque<Integer> keys, int cols, int rows, boolean color, boolean unicode,
+                            int winning, int opening) {
+        return scripted(keys, cols, rows, color, unicode, winning, opening, false);
+    }
+
+    static TuiView scripted(ArrayDeque<Integer> keys, int cols, int rows, boolean color, boolean unicode,
+                            int winning, int opening, boolean dev) {
+        return new TuiView(keys, cols, rows, color, unicode, winning, opening, dev);
+    }
+
+    private TuiView(ArrayDeque<Integer> keys, int cols, int rows, boolean color, boolean unicode,
+                    int winning, int opening, boolean dev) {
         this.terminal = null;
-        this.options = Options.parse(color ? new String[0] : new String[] {"--no-color"}, !color);
+        ArrayList<String> flags = new ArrayList<>();
+        if (!color) {
+            flags.add("--no-color");
+        }
+        if (dev) {
+            flags.add("--dev");
+        }
+        this.options = Options.parse(flags.toArray(String[]::new), !color);
         this.keys = keys;
         this.cols = cols;
         this.rows = rows;
-        snap.winning = Game.WINNING_SCORE;
-        snap.opening = Game.OPENING_SCORE;
+        snap.winning = winning;
+        snap.opening = opening;
         snap.color = color;
         snap.unicode = unicode;
     }
@@ -83,6 +101,23 @@ public final class TuiView implements View {
     }
 
     @Override
+    public int readBotCount(int seats) {
+        snap.phase = Snapshot.Phase.SETUP_BOTS;
+        snap.botMax = seats - 1;
+        redraw();
+        while (true) {
+            String effect = press(snap, readKey());
+            if ("bots".equals(effect)) {
+                return snap.countChoice;
+            }
+            if ("quit-now".equals(effect) || "quit-yes".equals(effect)) {
+                throw new Quit();
+            }
+            redraw();
+        }
+    }
+
+    @Override
     public void soloAgainstComputer() {
         snap.solo = true;
         snap.log("One human sits with the computer. Rook takes the other seat.");
@@ -103,6 +138,7 @@ public final class TuiView implements View {
                 Player player = new Player(snap.resultName, snap.resultBot);
                 if (player.computer) {
                     player.personality = Bot.assign();
+                    player.revealPersonality = options.dev;
                     snap.log(player.label() + " sits down for the computer.");
                 }
                 return player;
@@ -116,6 +152,7 @@ public final class TuiView implements View {
 
     @Override
     public void seatComputer(Player player) {
+        player.revealPersonality = options.dev;
         snap.log(player.label() + " sits down for the computer.");
     }
 
@@ -414,7 +451,8 @@ public final class TuiView implements View {
             return pressName(snap, key);
         }
         if (key == 'q' || key == 'Q') {
-            if (snap.phase == Snapshot.Phase.SETUP_COUNT || snap.phase == Snapshot.Phase.WIN) {
+            if (snap.phase == Snapshot.Phase.SETUP_COUNT || snap.phase == Snapshot.Phase.SETUP_BOTS
+                    || snap.phase == Snapshot.Phase.WIN) {
                 return "quit-now";
             }
             snap.confirmQuit = true;
@@ -430,6 +468,7 @@ public final class TuiView implements View {
             case DOUBLE_REROLL -> "ack";
             case WIN -> pressWin(key);
             case SETUP_COUNT -> pressCount(snap, key);
+            case SETUP_BOTS -> pressBots(snap, key);
             case SETUP_NAMES -> pressName(snap, key);
         };
     }
@@ -527,6 +566,19 @@ public final class TuiView implements View {
             return "count";
         }
         snap.log("Press 1-9, or 0 for 10");
+        return "hint";
+    }
+
+    /** One key. 0 is zero computers here, unlike the player-count screen. */
+    private static String pressBots(Snapshot snap, int key) {
+        if (key >= '0' && key <= '9') {
+            int count = key - '0';
+            if (count <= snap.botMax) {
+                snap.countChoice = count;
+                return "bots";
+            }
+        }
+        snap.log("Press 0-" + snap.botMax);
         return "hint";
     }
 

@@ -21,12 +21,18 @@ public final class LineView implements View {
     private final PrintWriter out;
     private final int winningScore;
     private final int openingScore;
+    private final boolean dev;
 
     public LineView(Reader in, Writer out, int winningScore, int openingScore) {
+        this(in, out, winningScore, openingScore, false);
+    }
+
+    public LineView(Reader in, Writer out, int winningScore, int openingScore, boolean dev) {
         this.in = in instanceof BufferedReader buffered ? buffered : new BufferedReader(in);
         this.out = out instanceof PrintWriter printer ? printer : new PrintWriter(out, true);
         this.winningScore = winningScore;
         this.openingScore = openingScore;
+        this.dev = dev;
     }
 
     /** The rules block, one string per line. Blank lines are empty strings. */
@@ -48,7 +54,7 @@ public final class LineView implements View {
         lines.add("The first bank that puts you on the board must be at least " + Scorer.format(openingScore) + ".");
         lines.add("After that you may bank any hand. The next player can roll the dice you left,");
         lines.add("starting from the points just banked, or throw all 5 dice as a new hand.");
-        lines.add("Type bot as a player's name to seat the computer. One player sits with Rook.");
+        lines.add("Choose how many computer players at setup, or type bot as a name to seat one. One player sits with Rook.");
         lines.add("Type ? for these rules, or quit to leave.");
         lines.add("");
         return lines;
@@ -79,6 +85,24 @@ public final class LineView implements View {
     }
 
     @Override
+    public int readBotCount(int seats) {
+        int max = seats - 1;
+        while (true) {
+            prompt("How many computer players? (0-" + max + ") ");
+            String line = readLine();
+            try {
+                int count = Integer.parseInt(line);
+                if (count >= 0 && count <= max) {
+                    return count;
+                }
+            } catch (NumberFormatException ignored) {
+                // Ask again below.
+            }
+            out.println("Enter a number from 0 to " + max + ".");
+        }
+    }
+
+    @Override
     public void soloAgainstComputer() {
         out.println("One human sits with the computer. Rook takes the other seat.");
     }
@@ -96,6 +120,7 @@ public final class LineView implements View {
                 String botName = Bot.nameFor(seated);
                 Player bot = new Player(botName, true);
                 bot.personality = Bot.assign();
+                bot.revealPersonality = dev;
                 out.println(bot.label() + " sits down for the computer.");
                 return bot;
             }
@@ -116,6 +141,7 @@ public final class LineView implements View {
 
     @Override
     public void seatComputer(Player player) {
+        player.revealPersonality = dev;
         out.println(player.label() + " sits down for the computer.");
     }
 

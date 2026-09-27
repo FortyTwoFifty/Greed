@@ -39,9 +39,14 @@ A selection is legal only when every die either scores or is a 1/5 leftover from
 - **Double re-roll:** If only 2 dice remain and they form a non-scoring double (2-2, 3-3, 4-4, or 6-6), the player gets an extra re-roll of just those 2 dice.
 - **Bust:** If you roll and can't score any die, you bust. You lose all points accumulated in that hand. If the hand had 0 points, you still lose 100 from your total.
 
+The defaults are 10,000 to win and an opening bank of 750. `./run.sh --board` and `--winning` change the opening bank and the winning total. `--board` must be a positive whole number strictly below `--winning`.
+
 ### Players
 
-Choose 1-10 players at setup. Name each seat freely, or type **bot** to seat the computer. In solo mode, the human plays against Rook.
+Choose 1-10 seats at setup, then how many of those seats are computer players.
+You name the rest. Type **bot** as a name to seat a computer in that seat.
+Computers are Rook, Rook 2, and so on. One human sits with Rook.
+A computer's Cautious, Steady, or Bold style is hidden unless you start with `--dev`.
 
 ### Controls (TUI)
 
@@ -68,6 +73,8 @@ Run with `--plain` to play in a line-by-line transcript mode instead of the full
 ./run.sh              # TUI mode
 ./run.sh --plain      # Line transcript mode
 ./run.sh --no-color   # Disable color
+./run.sh --dev                         # show each computer's Cautious, Steady, or Bold
+./run.sh --board 300 --winning 2000    # opening bank 300, first to 2,000
 ./test.sh             # Compile and run the three test mains
 ```
 
@@ -76,6 +83,8 @@ Run with `--plain` to play in a line-by-line transcript mode instead of the full
 | Environment | Effect |
 |-------------|--------|
 | `NO_COLOR` | Disables color and animation |
+
+The command line overrides the scores for that game. The defaults stay `WINNING_SCORE` = 10,000 and `OPENING_SCORE` = 750. `--board` and `--winning` take the next argument (`300`, `2000`, not `10_000`). `--board=300` is not a supported form.
 
 You can also set custom scores when constructing a Game object programmatically. The class constants define the defaults:
 

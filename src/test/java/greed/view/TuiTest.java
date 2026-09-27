@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import greed.rules.Bot;
 import greed.rules.Options;
 import greed.rules.Player;
 
@@ -27,6 +28,13 @@ public final class TuiTest {
         rulesOverlay();
         layout();
         options();
+        configuredRules();
+        personalityTag();
+        botCountScreen();
+        countedBotsOnTheScreen();
+        tokenBesideTheBotCount();
+        scriptedDevShowsThePersonality();
+        soloStillRejectsBot();
         imports();
         if (failed > 0) {
             System.out.println(failed + " failed");
@@ -557,19 +565,256 @@ public final class TuiTest {
     private static void options() {
         Options plain = Options.parse(new String[] {"--plain"}, false);
         check(plain.plain && plain.color && plain.animate, "plain keeps color flags for a line game");
+        check(!plain.dev && plain.opening == 750 && plain.winning == 10_000,
+                "defaults stay hidden, 750, and 10,000");
         Options muted = Options.parse(new String[] {"--no-color"}, false);
         check(!muted.color && !muted.animate, "no-color disables animation");
         Options env = Options.parse(new String[0], true);
         check(!env.color && !env.animate, "NO_COLOR disables color and animation");
         Options still = Options.parse(new String[] {"--no-anim"}, false);
         check(still.color && !still.animate, "no-anim keeps color");
-        boolean threw = false;
+        Options dev = Options.parse(new String[] {"--dev"}, false);
+        check(dev.dev && dev.color && dev.animate && !dev.plain, "dev leaves color and animation alone");
+        Options low = Options.parse(new String[] {"--board", "300", "--winning", "2000"}, false);
+        check(low.opening == 300 && low.winning == 2_000, "board then winning stores both");
+        Options flipped = Options.parse(new String[] {"--winning", "2000", "--board", "300"}, false);
+        check(flipped.opening == 300 && flipped.winning == 2_000, "winning then board stores both");
+        rejects(new String[] {"--fancy"}, "Unknown option: --fancy");
+        rejects(new String[] {"--board"}, "--board needs a number");
+        rejects(new String[] {"--winning"}, "--winning needs a number");
+        rejects(new String[] {"--board", "foo"}, "--board must be a whole number");
+        rejects(new String[] {"--winning", "10_000"}, "--winning must be a whole number");
+        rejects(new String[] {"--board", "--dev"}, "--board must be a whole number");
+        rejects(new String[] {"--board", "0"}, "--board must be greater than 0");
+        rejects(new String[] {"--board", "-3"}, "--board must be greater than 0");
+        rejects(new String[] {"--winning", "-1"}, "--winning must be greater than 0");
+        rejects(new String[] {"--board", "5000", "--winning", "1000"}, "--board must be less than --winning");
+        rejects(new String[] {"--board", "1000", "--winning", "1000"}, "--board must be less than --winning");
+        rejects(new String[] {"--winning", "500"}, "--board must be less than --winning");
+        rejects(new String[] {"--board=300"}, "Unknown option: --board=300");
+    }
+
+    private static void rejects(String[] args, String message) {
         try {
-            Options.parse(new String[] {"--fancy"}, false);
+            Options.parse(args, false);
+            check(false, "accepted " + String.join(" ", args));
         } catch (IllegalArgumentException e) {
-            threw = e.getMessage().contains("--fancy");
+            check(message.equals(e.getMessage()), message + " (was " + e.getMessage() + ")");
         }
-        check(threw, "unknown option is rejected");
+    }
+
+    private static void configuredRules() {
+        String rules = String.join("\n", LineView.rulesText(2_000, 300));
+        check(rules.contains("First player to 2,000 points wins."), "rules name the winning score");
+        check(rules.contains("at least 300."), "rules name the opening score");
+        check(rules.contains("Choose how many computer players at setup, or type bot as a name to seat one."),
+                "rules mention the bot count and the token");
+
+        Snapshot overlay = hold();
+        overlay.rulesOpen = true;
+        overlay.winning = 2_000;
+        overlay.opening = 300;
+        String open = Frame.render(overlay, 80, 24);
+        assertFrame(open, 80, 24, "custom rules");
+        check(open.contains("First player to 2,000 points wins."), "overlay names 2,000");
+        check(open.contains("at least 300."), "overlay names 300");
+
+        Snapshot defaults = hold();
+        defaults.rulesOpen = true;
+        String stock = Frame.render(defaults, 80, 24);
+        check(stock.contains("10,000") && stock.contains("750"), "the default overlay keeps 10,000 and 750");
+
+        Snapshot count = countSnap();
+        count.opening = 300;
+        count.winning = 2_000;
+        String setup = Frame.render(count, 80, 24);
+        check(setup.contains("first bank must be 300+"), "cheat sheet uses the opening score");
+        check(setup.contains("First to 2,000."), "count screen names the winning score");
+    }
+
+    private static void personalityTag() {
+        Snapshot hidden = hold();
+        hidden.players.get(1).personality = Bot.Personality.STEADY;
+        hidden.players.get(1).revealPersonality = false;
+        String plain = Frame.render(hidden, 80, 24);
+        check(plain.contains("[bot]"), "a hidden computer keeps the bot tag");
+        check(!plain.contains("(Steady)"), "a hidden computer omits the adjective");
+
+        Snapshot shown = hold();
+        shown.players.get(1).personality = Bot.Personality.STEADY;
+        shown.players.get(1).revealPersonality = true;
+        String dev = Frame.render(shown, 80, 24);
+        check(dev.contains("(Steady)"), "dev shows the adjective");
+        check(!dev.contains("[bot]"), "dev drops the bot tag");
+    }
+
+    private static void botCountScreen() {
+        Snapshot three = botSnap(3);
+        String frame = Frame.render(three, 80, 24);
+        assertFrame(frame, 80, 24, "bot count");
+        check(frame.contains("How many computer players?"), "bot screen asks");
+        check(frame.contains("0 to 3"), "bot screen shows the range");
+        String hint = strip(frame);
+        check(hint.contains("0 none") && hint.contains("1-3 bots") && hint.contains("q quit"),
+                "bot hint lists none, the range, and quit");
+        check(!frame.contains("0 ten"), "bot screen does not say ten");
+
+        String one = Frame.render(botSnap(1), 60, 20);
+        assertFrame(one, 60, 20, "one bot max");
+        String oneHint = strip(one);
+        check(oneHint.contains("0 none") && oneHint.contains("1 bot") && oneHint.contains("q quit"),
+                "one computer is labeled bot");
+        check(!one.contains("0 ten"), "one-computer hint is not the player hint");
+
+        Snapshot keys = botSnap(3);
+        check("bots".equals(TuiView.press(keys, '0')) && keys.countChoice == 0, "0 means no computers");
+        check("bots".equals(TuiView.press(keys, '2')) && keys.countChoice == 2, "2 seats two computers");
+        check("hint".equals(TuiView.press(keys, '4')) && keys.logNewer.contains("Press 0-3"),
+                "too many computers is refused");
+        check("quit-now".equals(TuiView.press(botSnap(3), 'q')), "bot count quits immediately");
+
+        Snapshot naming = new Snapshot();
+        naming.unicode = true;
+        naming.color = true;
+        naming.phase = Snapshot.Phase.SETUP_NAMES;
+        naming.nameBuf.append("bot");
+        String named = Frame.render(naming, 80, 24);
+        assertFrame(named, 80, 24, "bot token");
+        check(named.contains("seats the computer"), "typing bot still seats the computer");
+    }
+
+    private static Snapshot botSnap(int max) {
+        Snapshot snap = new Snapshot();
+        snap.unicode = true;
+        snap.color = true;
+        snap.phase = Snapshot.Phase.SETUP_BOTS;
+        snap.botMax = max;
+        return snap;
+    }
+
+    private static void countedBotsOnTheScreen() {
+        ArrayDeque<Integer> keys = new ArrayDeque<>();
+        keys.add((int) '4');
+        keys.add((int) '2');
+        type(keys, "Ann");
+        type(keys, "Bea");
+        TuiView view = TuiView.scripted(keys, 80, 24, true, true);
+        List<Player> players = takeSeats(view);
+        view.goesFirst(players.get(0));
+        view.scores(players);
+        view.startTurn(players.get(0));
+        String joined = String.join("\n", view.frames());
+        check(countOf(joined, "[bot]") >= 2, "two computer rows");
+        check(joined.contains("Ann goes first."), "the first human leads");
+        check(players.get(0).name.equals("Ann") && !players.get(0).computer, "Ann is seated first");
+        check(players.get(2).computer && players.get(3).computer, "the computers sit last");
+    }
+
+    private static void tokenBesideTheBotCount() {
+        ArrayDeque<Integer> keys = new ArrayDeque<>();
+        keys.add((int) '3');
+        keys.add((int) '1');
+        type(keys, "Ann");
+        type(keys, "bot");
+        List<Player> players = takeSeats(TuiView.scripted(keys, 80, 24, true, true));
+        check(players.size() == 3, "tui fills three seats");
+        check(!players.get(0).computer && players.get(0).name.equals("Ann"), "tui Ann is human");
+        check(players.get(1).computer && players.get(1).name.equals("Rook") && players.get(1).personality != null,
+                "tui token seats Rook");
+        check(players.get(2).computer && players.get(2).name.equals("Rook 2") && players.get(2).personality != null,
+                "tui counted computer is Rook 2");
+        String frame = board(players);
+        check(countOf(frame, "[bot]") == 2, "tui shows both computers");
+        check(!frame.contains("(Steady)") && !frame.contains("(Cautious)") && !frame.contains("(Bold)"),
+                "tui hides both personalities");
+    }
+
+    private static void scriptedDevShowsThePersonality() {
+        Bot.forced = Bot.Personality.STEADY;
+        try {
+            List<Player> devPlayers = takeSeats(scriptedSeat(true));
+            String dev = board(devPlayers);
+            check(dev.contains("(Steady)"), "a dev script shows Steady");
+            check(!dev.contains("[bot]"), "a dev script drops the bot tag");
+            check(devPlayers.get(1).computer && devPlayers.get(1).personality == Bot.Personality.STEADY
+                            && devPlayers.get(1).revealPersonality,
+                    "dev seating stores Steady and reveals it");
+
+            List<Player> plainPlayers = takeSeats(scriptedSeat(false));
+            String plain = board(plainPlayers);
+            check(plain.contains("[bot]"), "a normal script keeps the bot tag");
+            check(!plain.contains("(Steady)"), "a normal script hides Steady");
+            check(plainPlayers.get(1).personality == Bot.Personality.STEADY && !plainPlayers.get(1).revealPersonality,
+                    "a normal script still stores Steady");
+        } finally {
+            Bot.forced = null;
+        }
+    }
+
+    private static void soloStillRejectsBot() {
+        ArrayDeque<Integer> keys = new ArrayDeque<>();
+        keys.add((int) '1');
+        type(keys, "bot");
+        keys.add(127);
+        keys.add(127);
+        keys.add(127);
+        type(keys, "Ada");
+        TuiView view = TuiView.scripted(keys, 80, 24, true, true);
+        check(view.readPlayerCount() == 1, "solo is one seat");
+        view.soloAgainstComputer();
+        Player ada = view.readSeat(1, new ArrayList<>(), true);
+        check("Ada".equals(ada.name) && !ada.computer, "solo keeps the human");
+        boolean rejected = false;
+        boolean asked = false;
+        for (String frame : view.frames()) {
+            if (frame.contains("Type your name. Rook takes the other seat.")) {
+                rejected = true;
+            }
+            if (frame.contains("How many computer players?")) {
+                asked = true;
+            }
+        }
+        check(rejected, "solo rejects bot");
+        check(!asked, "solo skips the bot count");
+    }
+
+    private static TuiView scriptedSeat(boolean dev) {
+        ArrayDeque<Integer> keys = new ArrayDeque<>();
+        keys.add((int) '2');
+        keys.add((int) '1');
+        type(keys, "Ann");
+        return TuiView.scripted(keys, 80, 24, true, true, 10_000, 750, dev);
+    }
+
+    private static List<Player> takeSeats(TuiView view) {
+        int seats = view.readPlayerCount();
+        int bots = seats == 1 ? 0 : view.readBotCount(seats);
+        List<Player> players = new ArrayList<>();
+        for (int i = 1; i <= seats - bots; i++) {
+            players.add(view.readSeat(i, players, seats == 1));
+        }
+        int counted = bots + (seats == 1 ? 1 : 0);
+        for (int i = 0; i < counted; i++) {
+            Player rook = new Player(Bot.nameFor(players), true);
+            rook.personality = Bot.assign();
+            players.add(rook);
+            view.seatComputer(rook);
+        }
+        return players;
+    }
+
+    private static String board(List<Player> players) {
+        Snapshot snap = hold();
+        snap.players = new ArrayList<>(players);
+        snap.current = 0;
+        return Frame.render(snap, 80, 24);
+    }
+
+    private static void type(ArrayDeque<Integer> keys, String text) {
+        for (int i = 0; i < text.length(); i++) {
+            keys.add((int) text.charAt(i));
+        }
+        keys.add((int) '\n');
     }
 
     private static void imports() throws Exception {
